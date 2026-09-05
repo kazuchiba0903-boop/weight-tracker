@@ -117,7 +117,7 @@ canvas{width:100%;height:100%}
 .bottom-nav .bicon{display:block;font-size:20px;margin-bottom:2px}
 @media(min-width:720px){
   .grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .summary{grid-template-columns:repeat(3,1fr)}
+  .summary{grid-template-columns:repeat(4,1fr)}
   .metric{border-bottom:0;border-right:1px solid #d8e8e6}.metric:last-child{border-right:0}
   .bottom-nav{display:none}
 }
@@ -175,11 +175,13 @@ canvas{width:100%;height:100%}
       <div class="metric"><div class="label">最新の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
       <div class="metric"><div class="label">基準との差</div><div class="value blue" id="calDiff">—</div><div class="sub">基準 2,325 kcal</div></div>
       <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub">2,325 kcal に対して</div></div>
+      <div class="metric"><div class="label">累積差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">期間中の基準との差を体重換算</div></div>
     </div>
     <div class="chart"><canvas id="cc"></canvas></div>
     <div class="legend-note">
       ・縦軸は 500〜2,325 kcal で表示します。<br>
-      ・破線は基準カロリー 2,325 kcal です。<br>
+      ・赤い破線は基準カロリー 2,325 kcal です。<br>
+      ・青緑の点線は期間中の平均摂取カロリーです。<br>
       ・主な目安線として 2,000 / 1,500 / 1,000 kcal を表示します。
     </div>
   </div>
@@ -279,7 +281,15 @@ function renderSummary(){
     const z=lc.calories-CAL_BASE;
     calDiff.textContent=(z>0?"+":"")+Math.round(z).toLocaleString()+" kcal";
     calRate.textContent=(lc.calories/CAL_BASE*100).toFixed(1)+" %";
-  }else{calDiff.textContent="—";calRate.textContent="—"}
+
+    const cumulativeDiff=cs.reduce((sum,r)=>sum+(r.calories-CAL_BASE),0);
+    const kg=cumulativeDiff/7200;
+    calKg.textContent=(kg>0?"+":"")+kg.toFixed(1)+" kg";
+  }else{
+    calDiff.textContent="—";
+    calRate.textContent="—";
+    calKg.textContent="—";
+  }
 
   latestW.textContent=lw?lw.weight.toFixed(1)+" kg":"—";
   latestWDate.textContent=lw?jpDate(lw.date):"";
@@ -315,6 +325,18 @@ function drawCalChart(){
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="left";ctx.fillText("kcal",p.l-44,p.t-7);
   ctx.fillStyle="#ff3b30";ctx.textAlign="right";ctx.fillText("基準 2,325",W-p.r,Y(2325)-8);
+
+  const avgCal=rows.reduce((sum,r)=>sum+r.calories,0)/rows.length;
+  if(avgCal>=min && avgCal<=max){
+    const ay=Y(avgCal);
+    ctx.strokeStyle="#0f8b8d";
+    ctx.lineWidth=2;
+    ctx.setLineDash([3,5]);
+    ctx.beginPath();ctx.moveTo(p.l,ay);ctx.lineTo(W-p.r,ay);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle="#0f8b8d";
+    ctx.textAlign="left";
+    ctx.fillText("平均 "+Math.round(avgCal).toLocaleString()+" kcal",p.l+6,ay-8);
+  }
 
   const barW=Math.max(12,Math.min(42,step*.58));
   rows.forEach((r,i)=>{
