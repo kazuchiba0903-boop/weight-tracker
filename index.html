@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="体重記録">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<title>体重・カロリー記録</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#111827;--muted:#6b7280;--border:#e5e7eb;--accent:#2563eb;--danger:#dc2626}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:760px;margin:auto;padding:16px 14px 40px}.hero{padding:8px 2px 6px}.hero h1{font-size:27px;margin:0 0 5px}.sub{color:var(--muted);font-size:14px}
+.card,.stat{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 7px 22px rgba(0,0,0,.04)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.grid{display:grid;gap:12px}
+@media(min-width:640px){.stats{grid-template-columns:repeat(3,1fr)}.grid.three{grid-template-columns:1fr 1fr 1fr}}
+.k{font-size:12px;color:var(--muted);margin-bottom:4px}.v{font-size:24px;font-weight:800;line-height:1.15}
+label{display:block;color:var(--muted);font-size:13px;margin-bottom:5px}
+input{width:100%;padding:13px;border:1px solid var(--border);border-radius:12px;font-size:17px;background:#fff;color:var(--text)}
+button{border:0;border-radius:12px;padding:12px 14px;font-weight:700;font-size:15px;cursor:pointer}.primary{width:100%;background:var(--accent);color:#fff;margin-top:12px}.secondary{background:#eef2ff;color:#3730a3}.danger{background:#fef2f2;color:var(--danger)}
+.title{font-size:18px;font-weight:800;margin-bottom:12px}.goalrow{display:flex;gap:10px;align-items:end}.goalrow>div{flex:1}.note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+.chart{height:285px}canvas{width:100%;height:100%}.row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;border-top:1px solid var(--border);padding:10px 0}.row:first-child{border-top:0}.muted{font-size:14px;color:var(--muted);line-height:1.5}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.badge{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;margin-top:7px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero"><h1>体重・カロリー記録</h1><div class="sub">毎日10秒で記録。データはこの端末内に保存されます。</div></div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">今日 / 最新体重</div><div class="v" id="latest">—</div></div>
+    <div class="stat"><div class="k">前日比</div><div class="v" id="diff">—</div></div>
+    <div class="stat"><div class="k">目標まで</div><div class="v" id="remain">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="title">今日の記録</div>
+    <div class="grid three">
+      <div><label for="date">日付</label><input id="date" type="date"></div>
+      <div><label for="weight">体重 (kg)</label><input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="例 72.4"></div>
+      <div><label for="cal">摂取カロリー (kcal)</label><input id="cal" type="number" inputmode="numeric" step="1" placeholder="例 1850"></div>
+    </div>
+    <button class="primary" id="save">記録する</button>
+    <div class="badge" id="savedBadge" style="display:none">保存しました</div>
+  </div>
+
+  <div class="card">
+    <div class="title">目標体重</div>
+    <div class="goalrow">
+      <div><label for="goal">目標体重 (kg)</label><input id="goal" type="number" inputmode="decimal" step="0.1" placeholder="例 65.0"></div>
+      <button class="secondary" id="saveGoal">保存</button>
+    </div>
+    <div class="note">体重グラフでは目標体重を点線で表示します。</div>
+  </div>
+
+  <div class="card" id="weightCard"><div class="title">体重の推移</div><div class="chart"><canvas id="wc"></canvas></div></div>
+  <div class="card"><div class="title">摂取カロリーの推移</div><div class="chart"><canvas id="cc"></canvas></div></div>
+
+  <div class="card"><div class="title">履歴</div><div id="hist"></div></div>
+
+  <div class="card">
+    <div class="toolbar"><button class="secondary" id="csv">CSVバックアップ</button><button class="danger" id="clear">全データ削除</button></div>
+    <div class="note">Safariのサイトデータを削除すると記録も消える可能性があります。定期的なCSVバックアップをおすすめします。</div>
+  </div>
+</div>
+<script>
+const K="weight_calorie_tracker_v3",G="weight_calorie_goal_v3";
+const date=document.getElementById("date"),weight=document.getElementById("weight"),cal=document.getElementById("cal"),goal=document.getElementById("goal");
+function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+date.value=today();
+function load(){try{return JSON.parse(localStorage.getItem(K))||[]}catch{return[]}}
+function saveData(d){localStorage.setItem(K,JSON.stringify(d))}
+function sorted(){return load().sort((a,b)=>a.date.localeCompare(b.date))}
+function getGoal(){const x=localStorage.getItem(G);return x===null?null:Number(x)}
+const sg=getGoal();if(sg!=null&&Number.isFinite(sg))goal.value=sg.toFixed(1);
+
+document.getElementById("saveGoal").onclick=()=>{
+  if(goal.value===""){localStorage.removeItem(G);render();return}
+  const g=Number(goal.value);if(!Number.isFinite(g)||g<20||g>300)return alert("目標体重を正しく入力してください。");
+  localStorage.setItem(G,String(g));render()
+};
+
+function stats(d){
+  const w=d.filter(x=>x.weight!=null),last=w.at(-1),prev=w.at(-2),g=getGoal();
+  latest.textContent=last?last.weight.toFixed(1)+" kg":"—";
+  if(last&&prev){const z=last.weight-prev.weight;diff.textContent=(z>0?"+":"")+z.toFixed(1)+" kg"} else diff.textContent="—";
+  if(last&&g!=null){const z=last.weight-g;remain.textContent=Math.abs(z)<0.05?"達成":(z>0?"あと ":"目標より ")+Math.abs(z).toFixed(1)+" kg"} else remain.textContent="—";
+}
+function fmt(s){const a=s.split("-");return Number(a[1])+"/"+Number(a[2])}
+function chart(canvas,d,key,goalLine){
+  const ctx=canvas.getContext("2d"),r=canvas.getBoundingClientRect(),pr=devicePixelRatio||1;canvas.width=r.width*pr;canvas.height=r.height*pr;ctx.setTransform(pr,0,0,pr,0,0);
+  const rows=d.filter(x=>x[key]!=null),W=r.width,H=r.height;ctx.clearRect(0,0,W,H);
+  if(!rows.length){ctx.fillStyle="#6b7280";ctx.font="14px sans-serif";ctx.textAlign="center";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
+  let vals=rows.map(x=>x[key]),g=goalLine?getGoal():null;if(g!=null)vals.push(g);let mn=Math.min(...vals),mx=Math.max(...vals);if(mn===mx){mn-=1;mx+=1}let rg=mx-mn;mn-=rg*.12;mx+=rg*.12;
+  const p={l:48,r:14,t:20,b:36},X=i=>p.l+(rows.length===1?(W-p.l-p.r)/2:i*(W-p.l-p.r)/(rows.length-1)),Y=v=>p.t+(mx-v)*(H-p.t-p.b)/(mx-mn);
+  ctx.strokeStyle="#e5e7eb";ctx.fillStyle="#6b7280";ctx.font="12px sans-serif";
+  for(let i=0;i<4;i++){let v=mx-(mx-mn)*i/3,y=Y(v);ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();ctx.textAlign="right";ctx.fillText(key==="weight"?v.toFixed(1):Math.round(v),p.l-6,y+4)}
+  if(g!=null){const y=Y(g);ctx.setLineDash([7,6]);ctx.strokeStyle="#9ca3af";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#6b7280";ctx.textAlign="right";ctx.fillText("目標 "+g.toFixed(1)+" kg",W-p.r,y-6)}
+  ctx.strokeStyle="#2563eb";ctx.lineWidth=2.5;ctx.beginPath();rows.forEach((x,i)=>i?ctx.lineTo(X(i),Y(x[key])):ctx.moveTo(X(i),Y(x[key])));ctx.stroke();
+  ctx.fillStyle="#2563eb";rows.forEach((x,i)=>{ctx.beginPath();ctx.arc(X(i),Y(x[key]),3.5,0,Math.PI*2);ctx.fill()});
+  ctx.fillStyle="#6b7280";ctx.textAlign="center";const ids=rows.length<=6?rows.map((_,i)=>i):[0,Math.floor((rows.length-1)/2),rows.length-1];[...new Set(ids)].forEach(i=>ctx.fillText(fmt(rows[i].date),X(i),H-10));
+}
+function history(d){
+  hist.innerHTML="";if(!d.length){hist.innerHTML='<div class="muted">まだ記録がありません</div>';return}
+  [...d].reverse().forEach(item=>{
+    const idx=d.findIndex(x=>x.date===item.date),pw=d.slice(0,idx).reverse().find(x=>x.weight!=null);let dd="—";
+    if(item.weight!=null&&pw){const z=item.weight-pw.weight;dd=(z>0?"+":"")+z.toFixed(1)+" kg"}
+    const row=document.createElement("div");row.className="row";row.innerHTML=`<div><b>${item.date}</b><div class="muted">${item.weight!=null?item.weight.toFixed(1)+" kg":"体重 —"} ／ ${item.calories!=null?Math.round(item.calories)+" kcal":"カロリー —"}<br>前日比 ${dd}</div></div>`;
+    const e=document.createElement("button");e.className="secondary";e.textContent="編集";e.onclick=()=>{date.value=item.date;weight.value=item.weight??"";cal.value=item.calories??"";scrollTo({top:0,behavior:"smooth"})};
+    const del=document.createElement("button");del.className="danger";del.textContent="削除";del.onclick=()=>{if(confirm(item.date+" の記録を削除しますか？")){saveData(load().filter(x=>x.date!==item.date));render()}};
+    row.append(e,del);hist.append(row)
+  })
+}
+function render(){const d=sorted();stats(d);history(d);chart(wc,d,"weight",true);chart(cc,d,"calories",false)}
+document.getElementById("save").onclick=()=>{
+  const dt=date.value,w=weight.value===""?null:Number(weight.value),c=cal.value===""?null:Number(cal.value);
+  if(!dt)return alert("日付を入力してください。");if(w==null&&c==null)return alert("体重または摂取カロリーを入力してください。");
+  let d=load(),i=d.findIndex(x=>x.date===dt),rec={date:dt,weight:w,calories:c};if(i>=0)d[i]=rec;else d.push(rec);saveData(d);
+  weight.value="";cal.value="";date.value=today();render();savedBadge.style.display="inline-block";setTimeout(()=>savedBadge.style.display="none",1800);weightCard.scrollIntoView({behavior:"smooth",block:"start"})
+};
+document.getElementById("csv").onclick=()=>{
+  const d=sorted();if(!d.length)return alert("データがありません。");
+  const rows=[["date","weight_kg","calories_kcal"],...d.map(x=>[x.date,x.weight??"",x.calories??""])];
+  const csv=rows.map(r=>r.join(",")).join("\n"),b=new Blob([csv],{type:"text/csv;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="weight_calorie_log.csv";a.click();URL.revokeObjectURL(u)
+};
+document.getElementById("clear").onclick=()=>{if(confirm("すべての記録を削除しますか？")){localStorage.removeItem(K);render()}};
+window.addEventListener("resize",render);
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
+render();
+</script>
+</body></html>
