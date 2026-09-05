@@ -46,29 +46,57 @@ input{
       background:#fff;
       color:var(--text);
     }
-    input[type="date"]{
-      display:block;
-      width:100%;
-      min-width:0;
-      max-width:100%;
-      height:52px;
-      padding:0 14px;
-      text-align:left;
-      overflow:hidden;
-    }
-    input[type="date"]::-webkit-date-and-time-value{
-      text-align:left;
-      margin:0;
-      padding:0;
-    }
-    input[type="date"]::-webkit-datetime-edit{
-      padding:0;
-    }
-    input[type="date"]::-webkit-calendar-picker-indicator{
-      margin-left:auto;
-      flex:0 0 auto;
-    }
 button{border:0;border-radius:12px;padding:12px 14px;font-size:15px;font-weight:800;cursor:pointer}
+.date-field{
+  position:relative;
+  width:100%;
+  min-width:0;
+  height:52px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+  overflow:hidden;
+}
+.date-display{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 44px;
+  font-size:17px;
+  line-height:1;
+  color:var(--text);
+  text-align:center;
+  white-space:nowrap;
+  pointer-events:none;
+}
+.date-field::after{
+  content:"▣";
+  position:absolute;
+  right:14px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:17px;
+  color:#44545b;
+  pointer-events:none;
+}
+.date-native{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  min-width:0;
+  max-width:100%;
+  margin:0;
+  padding:0;
+  border:0;
+  opacity:0;
+  cursor:pointer;
+  -webkit-appearance:none;
+  appearance:none;
+}
+
 .primary{width:100%;background:var(--teal-dark);color:#fff;margin-top:12px}
 .secondary{background:#e9f4f3;color:var(--teal-dark)}.danger{background:#fff0ef;color:#c62828}
 .goalrow{display:flex;gap:10px;align-items:end}.goalrow>div{flex:1}
@@ -109,7 +137,13 @@ canvas{width:100%;height:100%}
   <div class="card">
     <h2 class="card-title"><span class="icon">✎</span>今日の記録</h2>
     <div class="grid grid3">
-      <div><label for="date">日付</label><input id="date" type="date"></div>
+      <div>
+        <label for="date">日付</label>
+        <div class="date-field">
+          <span id="dateDisplay" class="date-display"></span>
+          <input id="date" class="date-native" type="date" aria-label="日付">
+        </div>
+      </div>
       <div><label for="weight">体重 (kg)</label><input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="例 67.8"></div>
       <div><label for="cal">摂取カロリー (kcal)</label><input id="cal" type="number" inputmode="numeric" step="1" placeholder="例 1850"></div>
     </div>
@@ -182,13 +216,20 @@ canvas{width:100%;height:100%}
 
 <script>
 const K="weight_calorie_tracker_v3", G="weight_calorie_goal_v3", CAL_BASE=2325;
-const date=document.getElementById("date"),weight=document.getElementById("weight"),cal=document.getElementById("cal"),goal=document.getElementById("goal");
+const date=document.getElementById("date"),dateDisplay=document.getElementById("dateDisplay"),weight=document.getElementById("weight"),cal=document.getElementById("cal"),goal=document.getElementById("goal");
 
 function today(){
   const d=new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-date.value=today();
+function displayDate(s){
+  if(!s)return "";
+  const a=s.split("-");
+  return `${a[0]}/${a[1]}/${a[2]}`;
+}
+function syncDateDisplay(){ dateDisplay.textContent=displayDate(date.value); }
+
+date.value=today();syncDateDisplay();date.addEventListener("change",syncDateDisplay);
 
 function load(){try{return JSON.parse(localStorage.getItem(K))||[]}catch{return[]}}
 function saveData(d){localStorage.setItem(K,JSON.stringify(d))}
@@ -222,7 +263,7 @@ document.getElementById("save").onclick=()=>{
   let d=load(),i=d.findIndex(x=>x.date===dt),rec={date:dt,weight:w,calories:c};
   if(i>=0)d[i]=rec;else d.push(rec);
   saveData(d);
-  weight.value="";cal.value="";date.value=today();
+  weight.value="";cal.value="";date.value=today();syncDateDisplay();
   saved.style.display="inline-block";setTimeout(()=>saved.style.display="none",1600);
   render();switchPage("graphs");
 };
@@ -329,7 +370,7 @@ function renderHistory(){
     let dd="—";if(item.weight!=null&&pw){const z=item.weight-pw.weight;dd=(z>0?"+":"")+z.toFixed(1)+" kg"}
     const row=document.createElement("div");row.className="row";
     row.innerHTML=`<div><b>${item.date}</b><div class="muted">${item.weight!=null?item.weight.toFixed(1)+" kg":"体重 —"} ／ ${item.calories!=null?Math.round(item.calories).toLocaleString()+" kcal":"カロリー —"}<br>前日比 ${dd}</div></div>`;
-    const e=document.createElement("button");e.className="secondary";e.textContent="編集";e.onclick=()=>{date.value=item.date;weight.value=item.weight??"";cal.value=item.calories??"";switchPage("input")};
+    const e=document.createElement("button");e.className="secondary";e.textContent="編集";e.onclick=()=>{date.value=item.date;syncDateDisplay();weight.value=item.weight??"";cal.value=item.calories??"";switchPage("input")};
     const del=document.createElement("button");del.className="danger";del.textContent="削除";del.onclick=()=>{if(confirm(item.date+" の記録を削除しますか？")){saveData(load().filter(x=>x.date!==item.date));render()}};
     row.append(e,del);hist.append(row)
   })
