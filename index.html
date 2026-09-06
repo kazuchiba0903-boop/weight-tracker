@@ -175,7 +175,7 @@ canvas{width:100%;height:100%}
       <div class="metric"><div class="label">最新の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
       <div class="metric"><div class="label">基準との差</div><div class="value blue" id="calDiff">—</div><div class="sub">基準 2,325 kcal</div></div>
       <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub">2,325 kcal に対して</div></div>
-      <div class="metric"><div class="label">累積差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">期間中の基準との差を体重換算</div></div>
+      <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">最新日の差を体重換算</div></div>
     </div>
     <div class="chart"><canvas id="cc"></canvas></div>
     <div class="legend-note">
@@ -282,9 +282,8 @@ function renderSummary(){
     calDiff.textContent=(z>0?"+":"")+Math.round(z).toLocaleString()+" kcal";
     calRate.textContent=(lc.calories/CAL_BASE*100).toFixed(1)+" %";
 
-    const cumulativeDiff=cs.reduce((sum,r)=>sum+(r.calories-CAL_BASE),0);
-    const kg=cumulativeDiff/7200;
-    calKg.textContent=(kg>0?"+":"")+kg.toFixed(1)+" kg";
+    const kg=z/7200;
+    calKg.textContent=(kg>0?"+":"")+kg.toFixed(2)+" kg";
   }else{
     calDiff.textContent="—";
     calRate.textContent="—";
