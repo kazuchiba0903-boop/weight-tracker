@@ -105,7 +105,7 @@ button{border:0;border-radius:12px;padding:12px 14px;font-size:15px;font-weight:
 .metric{padding:8px 10px;text-align:center;border-bottom:1px solid #d8e8e6}.metric:last-child{border-bottom:0}
 .metric .label{font-size:13px;color:#58666d;margin-bottom:4px}.metric .value{font-size:25px;font-weight:900}.metric .sub{font-size:12px;color:#58666d;margin-top:3px}
 .blue{color:var(--blue)}
-.chart{height:330px;position:relative}
+.chart{height:330px;position:relative;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}.chart canvas{display:block;height:330px;max-width:none}
 canvas{width:100%;height:100%}
 .legend-note{margin-top:12px;padding:12px;border-radius:12px;background:#f7fafa;color:#57656c;font-size:13px;line-height:1.55}
 .row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:12px 0;border-top:1px solid var(--border)}
@@ -177,9 +177,9 @@ canvas{width:100%;height:100%}
       <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub">2,325 kcal に対して</div></div>
       <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">最新日の差を体重換算</div></div>
     </div>
-    <div class="chart"><canvas id="cc"></canvas></div>
+    <div class="chart" id="calChartScroll"><canvas id="cc"></canvas></div>
     <div class="legend-note">
-      ・表示期間は最新の記録日を含む過去7日間です。<br>      ・縦軸は 500〜2,325 kcal で表示します。<br>
+      ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>      ・縦軸は 500〜2,325 kcal で表示します。<br>
       ・赤い破線は基準カロリー 2,325 kcal です。<br>
       ・青緑の点線は最新の記録日を含む過去7日間の平均摂取カロリーです。<br>
       ・主な目安線として 2,000 / 1,500 / 1,000 kcal を表示します。
@@ -193,9 +193,9 @@ canvas{width:100%;height:100%}
       <div class="metric"><div class="label">前日比</div><div class="value blue" id="weightDiff">—</div><div class="sub"></div></div>
       <div class="metric"><div class="label">目標まで</div><div class="value" id="toGoal">—</div><div class="sub" id="goalSub"></div></div>
     </div>
-    <div class="chart"><canvas id="wc"></canvas></div>
+    <div class="chart" id="weightChartScroll"><canvas id="wc"></canvas></div>
     <div class="legend-note">
-      ・表示期間は最新の記録日を含む過去7日間です。<br>      ・縦軸の最小値は目標体重です。<br>
+      ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>      ・縦軸の最小値は目標体重です。<br>
       ・上限は記録されている体重の最大値 +1 kg です。<br>
       ・破線は目標体重です。
     </div>
@@ -247,6 +247,27 @@ function lastSevenDays(data){
   const cutoff=new Date(latest);cutoff.setDate(cutoff.getDate()-6);
   return ordered.filter(r=>{const dt=parseDateLocal(r.date);return dt>=cutoff&&dt<=latest});
 }
+function chartRowsWithValue(key){
+  return sorted().filter(r=>r[key]!=null);
+}
+function chartCssWidth(scrollEl, count){
+  const viewport=Math.max(scrollEl.clientWidth,280);
+  if(count<=7)return viewport;
+  return Math.round(viewport*(count/7));
+}
+function prepareScrollableCanvas(canvas, scrollEl, count){
+  const cssW=chartCssWidth(scrollEl,count);
+  canvas.style.width=cssW+"px";
+  canvas.style.height="330px";
+  const pr=devicePixelRatio||1;
+  canvas.width=Math.max(1,Math.round(cssW*pr));
+  canvas.height=Math.max(1,Math.round(330*pr));
+  const ctx=canvas.getContext("2d");
+  ctx.setTransform(pr,0,0,pr,0,0);
+  ctx.clearRect(0,0,cssW,330);
+  return {ctx,W:cssW,H:330};
+}
+
 const sg=getGoal(); if(sg!=null&&Number.isFinite(sg)) goal.value=sg.toFixed(1);
 
 function switchPage(id){
@@ -315,7 +336,7 @@ function prepCanvas(canvas){
 }
 
 function drawCalChart(){
-  const {ctx,W,H}=prepCanvas(cc), rows=lastSevenDays(sorted()).filter(x=>x.calories!=null);
+  const rows=chartRowsWithValue("calories"), {ctx,W,H}=prepareScrollableCanvas(cc,calChartScroll,rows.length);
   if(!rows.length){ctx.fillStyle="#78868c";ctx.textAlign="center";ctx.font="14px sans-serif";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
   const p={l:58,r:16,t:28,b:42}, min=500,max=2325, Y=v=>p.t+(max-v)*(H-p.t-p.b)/(max-min);
   const plotW=W-p.l-p.r, step=plotW/Math.max(rows.length,1), X=i=>p.l+step*(i+.5);
@@ -340,7 +361,8 @@ function drawCalChart(){
     ctx.fillRect(X(i)-barW/2,rawTop,barW,Math.max(2,bottom-rawTop));
   });
 
-  const avgCal=rows.reduce((sum,r)=>sum+r.calories,0)/rows.length;
+  const avgRows=lastSevenDays(sorted()).filter(r=>r.calories!=null);
+  const avgCal=avgRows.length?avgRows.reduce((sum,r)=>sum+r.calories,0)/avgRows.length:0;
   if(avgCal>=min && avgCal<=max){
     const ay=Y(avgCal);
     ctx.strokeStyle="#0f8b8d";ctx.lineWidth=2.5;ctx.setLineDash([4,4]);
@@ -348,20 +370,17 @@ function drawCalChart(){
 
     const label="平均 "+Math.round(avgCal).toLocaleString()+" kcal";
     ctx.font="12px sans-serif";
-    const tx=p.l+8, ty=ay-11, tw=ctx.measureText(label).width+12;
-    ctx.fillStyle="rgba(255,255,255,.96)";
-    ctx.fillRect(tx-5,ty-14,tw,20);
+    const tx=p.l+8, ty=ay-11;
     ctx.fillStyle="#0f8b8d";ctx.textAlign="left";
     ctx.fillText(label,tx,ty);
   }
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
-  const ids=rows.length<=7?rows.map((_,i)=>i):[0,Math.floor((rows.length-1)/2),rows.length-1];
-  [...new Set(ids)].forEach(i=>ctx.fillText(shortDate(rows[i].date),X(i),H-16));
+  rows.forEach((r,i)=>ctx.fillText(shortDate(r.date),X(i),H-16));
 }
 
 function drawWeightChart(){
-  const {ctx,W,H}=prepCanvas(wc), rows=lastSevenDays(sorted()).filter(x=>x.weight!=null), g=getGoal();
+  const rows=chartRowsWithValue("weight"), {ctx,W,H}=prepareScrollableCanvas(wc,weightChartScroll,rows.length), g=getGoal();
   if(!rows.length){ctx.fillStyle="#78868c";ctx.textAlign="center";ctx.font="14px sans-serif";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
   const vals=rows.map(x=>x.weight);
   let min=g!=null?g:Math.floor((Math.min(...vals)-1)*10)/10;
@@ -390,8 +409,7 @@ function drawWeightChart(){
   ctx.fillStyle="#2b9da0";rows.forEach((r,i)=>{ctx.beginPath();ctx.arc(X(i),Y(r.weight),4.5,0,Math.PI*2);ctx.fill()});
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
-  const ids=rows.length<=7?rows.map((_,i)=>i):[0,Math.floor((rows.length-1)/2),rows.length-1];
-  [...new Set(ids)].forEach(i=>ctx.fillText(shortDate(rows[i].date),X(i),H-16));
+  rows.forEach((r,i)=>ctx.fillText(shortDate(r.date),X(i),H-16));
 }
 
 function renderHistory(){
@@ -408,7 +426,14 @@ function renderHistory(){
   })
 }
 
-function renderCharts(){drawCalChart();drawWeightChart()}
+function renderCharts(){
+  drawCalChart();
+  drawWeightChart();
+  requestAnimationFrame(()=>{
+    calChartScroll.scrollLeft=calChartScroll.scrollWidth;
+    weightChartScroll.scrollLeft=weightChartScroll.scrollWidth;
+  });
+}
 function render(){renderSummary();renderHistory();if(document.getElementById("graphs").classList.contains("active"))renderCharts()}
 
 document.getElementById("csv").onclick=()=>{
