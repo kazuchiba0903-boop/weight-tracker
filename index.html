@@ -249,12 +249,34 @@ function displayDate(s){
 }
 function syncDateDisplay(){ dateDisplay.textContent=displayDate(date.value); }
 
-date.value=today();syncDateDisplay();date.addEventListener("change",syncDateDisplay);
+date.value=today();
+syncDateDisplay();
+loadRecordForSelectedDate();
+date.addEventListener("change",()=>{
+  syncDateDisplay();
+  loadRecordForSelectedDate();
+});
 
 function load(){try{return JSON.parse(localStorage.getItem(K))||[]}catch{return[]}}
 function saveData(d){localStorage.setItem(K,JSON.stringify(d))}
 function sorted(){return load().sort((a,b)=>a.date.localeCompare(b.date))}
 function getGoal(){const x=localStorage.getItem(G);return x===null?null:Number(x)}
+function loadRecordForSelectedDate(){
+  const dt=date.value;
+  if(!dt){
+    weight.value="";
+    cal.value="";
+    return;
+  }
+  const rec=load().find(r=>r.date===dt);
+  if(rec){
+    weight.value=rec.weight!=null?rec.weight:"";
+    cal.value=rec.calories!=null?rec.calories:"";
+  }else{
+    weight.value="";
+    cal.value="";
+  }
+}
 function shortDate(s){const a=s.split("-");return `${Number(a[1])}/${Number(a[2])}`}
 function jpDate(s){const a=s.split("-");return `${Number(a[1])}月${Number(a[2])}日`}
 function parseDateLocal(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
@@ -324,7 +346,7 @@ document.getElementById("save").onclick=()=>{
   let d=load(),i=d.findIndex(x=>x.date===dt),rec={date:dt,weight:w,calories:c};
   if(i>=0)d[i]=rec;else d.push(rec);
   saveData(d);
-  weight.value="";cal.value="";date.value=today();syncDateDisplay();
+  date.value=today();syncDateDisplay();loadRecordForSelectedDate();
   saved.style.display="inline-block";setTimeout(()=>saved.style.display="none",1600);
   render();switchPage("graphs");
 };
@@ -485,7 +507,7 @@ function renderHistory(){
     let dd="—";if(item.weight!=null&&pw){const z=item.weight-pw.weight;dd=(z>0?"+":"")+z.toFixed(1)+" kg"}
     const row=document.createElement("div");row.className="row";
     row.innerHTML=`<div><b>${item.date}</b><div class="muted">${item.weight!=null?item.weight.toFixed(1)+" kg":"体重 —"} ／ ${item.calories!=null?Math.round(item.calories).toLocaleString()+" kcal":"カロリー —"}<br>前日比 ${dd}</div></div>`;
-    const e=document.createElement("button");e.className="secondary";e.textContent="編集";e.onclick=()=>{date.value=item.date;syncDateDisplay();weight.value=item.weight??"";cal.value=item.calories??"";switchPage("input")};
+    const e=document.createElement("button");e.className="secondary";e.textContent="編集";e.onclick=()=>{date.value=item.date;syncDateDisplay();loadRecordForSelectedDate();switchPage("input")};
     const del=document.createElement("button");del.className="danger";del.textContent="削除";del.onclick=()=>{if(confirm(item.date+" の記録を削除しますか？")){saveData(load().filter(x=>x.date!==item.date));render()}};
     row.append(e,del);hist.append(row)
   })
