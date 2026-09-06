@@ -106,6 +106,24 @@ button{border:0;border-radius:12px;padding:12px 14px;font-size:15px;font-weight:
 .metric .label{font-size:13px;color:#58666d;margin-bottom:4px}.metric .value{font-size:25px;font-weight:900}.metric .sub{font-size:12px;color:#58666d;margin-top:3px}
 .blue{color:var(--blue)}
 .chart{height:330px;position:relative;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}.chart canvas{display:block;height:330px;max-width:none}
+.chart-shell{position:relative}
+.y-axis-fixed{
+  position:absolute;
+  left:0;
+  top:0;
+  width:58px;
+  height:330px;
+  z-index:6;
+  pointer-events:none;
+  background:linear-gradient(90deg,#fff 0%,#fff 82%,rgba(255,255,255,.92) 100%);
+  border-radius:0;
+}
+.y-axis-fixed canvas{
+  width:58px !important;
+  height:330px !important;
+  display:block;
+}
+
 canvas{width:100%;height:100%}
 .legend-note{margin-top:12px;padding:12px;border-radius:12px;background:#f7fafa;color:#57656c;font-size:13px;line-height:1.55}
 .row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:12px 0;border-top:1px solid var(--border)}
@@ -177,11 +195,11 @@ canvas{width:100%;height:100%}
       <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub">2,325 kcal に対して</div></div>
       <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">最新日の差を体重換算</div></div>
     </div>
-    <div class="chart" id="calChartScroll"><canvas id="cc"></canvas></div>
+    <div class="chart-shell"><div class="y-axis-fixed"><canvas id="ccAxis"></canvas></div><div class="chart" id="calChartScroll"><canvas id="cc"></canvas></div></div>
     <div class="legend-note">
       ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>      ・縦軸は 500〜2,325 kcal で表示します。<br>
       ・赤い破線は基準カロリー 2,325 kcal です。<br>
-      ・青緑の点線は最新の記録日を含む過去7日間の平均摂取カロリーです。<br>
+      ・青緑の点線は最新の記録日を含む過去7日間の棒グラフ上だけに表示します。<br>
       ・主な目安線として 2,000 / 1,500 / 1,000 kcal を表示します。
     </div>
   </div>
@@ -193,7 +211,7 @@ canvas{width:100%;height:100%}
       <div class="metric"><div class="label">前日比</div><div class="value blue" id="weightDiff">—</div><div class="sub"></div></div>
       <div class="metric"><div class="label">目標まで</div><div class="value" id="toGoal">—</div><div class="sub" id="goalSub"></div></div>
     </div>
-    <div class="chart" id="weightChartScroll"><canvas id="wc"></canvas></div>
+    <div class="chart-shell"><div class="y-axis-fixed"><canvas id="wcAxis"></canvas></div><div class="chart" id="weightChartScroll"><canvas id="wc"></canvas></div></div>
     <div class="legend-note">
       ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>      ・縦軸の最小値は目標体重です。<br>
       ・上限は記録されている体重の最大値 +1 kg です。<br>
@@ -267,6 +285,18 @@ function prepareScrollableCanvas(canvas, scrollEl, count){
   ctx.clearRect(0,0,cssW,330);
   return {ctx,W:cssW,H:330};
 }
+function prepareAxisCanvas(canvas){
+  const cssW=58, cssH=330, pr=devicePixelRatio||1;
+  canvas.style.width=cssW+"px";
+  canvas.style.height=cssH+"px";
+  canvas.width=Math.round(cssW*pr);
+  canvas.height=Math.round(cssH*pr);
+  const ctx=canvas.getContext("2d");
+  ctx.setTransform(pr,0,0,pr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  return {ctx,W:cssW,H:cssH};
+}
+
 
 const sg=getGoal(); if(sg!=null&&Number.isFinite(sg)) goal.value=sg.toFixed(1);
 
@@ -348,10 +378,18 @@ function drawCalChart(){
     ctx.strokeStyle=v===2325?"#ff3b30":"#9aa8ad";
     ctx.setLineDash(v===2325?[7,5]:[6,5]);
     ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle="#536168";ctx.textAlign="right";ctx.fillText(v.toLocaleString(),p.l-8,y+4);
   });
 
-  ctx.fillStyle="#5d6a70";ctx.textAlign="left";ctx.fillText("kcal",p.l-44,p.t-7);
+  const calAxis=prepareAxisCanvas(ccAxis);
+  calAxis.ctx.font="12px sans-serif";
+  calAxis.ctx.fillStyle="#536168";
+  calAxis.ctx.textAlign="right";
+  levels.forEach(v=>{
+    calAxis.ctx.fillText(v.toLocaleString(),50,Y(v)+4);
+  });
+  calAxis.ctx.fillStyle="#5d6a70";
+  calAxis.ctx.textAlign="left";
+  calAxis.ctx.fillText("kcal",8,p.t-7);
   ctx.fillStyle="#ff3b30";ctx.textAlign="right";ctx.fillText("基準 2,325",W-p.r,Y(2325)-8);
 
   const barW=Math.max(12,Math.min(42,step*.58));
@@ -363,16 +401,34 @@ function drawCalChart(){
 
   const avgRows=lastSevenDays(sorted()).filter(r=>r.calories!=null);
   const avgCal=avgRows.length?avgRows.reduce((sum,r)=>sum+r.calories,0)/avgRows.length:0;
-  if(avgCal>=min && avgCal<=max){
+  if(avgRows.length && avgCal>=min && avgCal<=max){
     const ay=Y(avgCal);
-    ctx.strokeStyle="#0f8b8d";ctx.lineWidth=2.5;ctx.setLineDash([4,4]);
-    ctx.beginPath();ctx.moveTo(p.l,ay);ctx.lineTo(W-p.r,ay);ctx.stroke();ctx.setLineDash([]);
 
-    const label="平均 "+Math.round(avgCal).toLocaleString()+" kcal";
-    ctx.font="12px sans-serif";
-    const tx=p.l+8, ty=ay-11;
-    ctx.fillStyle="#0f8b8d";ctx.textAlign="left";
-    ctx.fillText(label,tx,ty);
+    const firstDate=avgRows[0].date;
+    const lastDate=avgRows[avgRows.length-1].date;
+    const firstIdx=rows.findIndex(r=>r.date===firstDate);
+    const lastIdx=rows.findIndex(r=>r.date===lastDate);
+
+    if(firstIdx>=0 && lastIdx>=0){
+      const lineStart=Math.max(p.l, X(firstIdx)-step*0.42);
+      const lineEnd=Math.min(W-p.r, X(lastIdx)+step*0.42);
+
+      ctx.strokeStyle="#0f8b8d";
+      ctx.lineWidth=2.5;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(lineStart,ay);
+      ctx.lineTo(lineEnd,ay);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const label="平均 "+Math.round(avgCal).toLocaleString()+" kcal";
+      ctx.font="12px sans-serif";
+      const tx=lineStart+6, ty=ay-11;
+      ctx.fillStyle="#0f8b8d";
+      ctx.textAlign="left";
+      ctx.fillText(label,tx,ty);
+    }
   }
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
@@ -391,12 +447,21 @@ function drawWeightChart(){
 
   ctx.font="12px sans-serif";ctx.lineWidth=1;
   const ticks=5;
+  const weightTickVals=[];
   for(let i=0;i<ticks;i++){
     const v=max-(max-min)*i/(ticks-1),y=Y(v);
+    weightTickVals.push(v);
     ctx.strokeStyle="#dce5e6";ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();
-    ctx.fillStyle="#536168";ctx.textAlign="right";ctx.fillText(v.toFixed(1),p.l-8,y+4);
   }
-  ctx.fillStyle="#5d6a70";ctx.textAlign="left";ctx.fillText("kg",p.l-34,p.t-7);
+
+  const weightAxis=prepareAxisCanvas(wcAxis);
+  weightAxis.ctx.font="12px sans-serif";
+  weightAxis.ctx.fillStyle="#536168";
+  weightAxis.ctx.textAlign="right";
+  weightTickVals.forEach(v=>weightAxis.ctx.fillText(v.toFixed(1),50,Y(v)+4));
+  weightAxis.ctx.fillStyle="#5d6a70";
+  weightAxis.ctx.textAlign="left";
+  weightAxis.ctx.fillText("kg",18,p.t-7);
 
   if(g!=null){
     const y=Y(g);ctx.strokeStyle="#ff3b30";ctx.setLineDash([7,5]);ctx.lineWidth=2;
