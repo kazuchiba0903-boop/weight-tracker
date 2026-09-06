@@ -179,9 +179,9 @@ canvas{width:100%;height:100%}
     </div>
     <div class="chart"><canvas id="cc"></canvas></div>
     <div class="legend-note">
-      ・縦軸は 500〜2,325 kcal で表示します。<br>
+      ・表示期間は最新の記録日を含む過去7日間です。<br>      ・縦軸は 500〜2,325 kcal で表示します。<br>
       ・赤い破線は基準カロリー 2,325 kcal です。<br>
-      ・青緑の点線は期間中の平均摂取カロリーです。<br>
+      ・青緑の点線は最新の記録日を含む過去7日間の平均摂取カロリーです。<br>
       ・主な目安線として 2,000 / 1,500 / 1,000 kcal を表示します。
     </div>
   </div>
@@ -195,7 +195,7 @@ canvas{width:100%;height:100%}
     </div>
     <div class="chart"><canvas id="wc"></canvas></div>
     <div class="legend-note">
-      ・縦軸の最小値は目標体重です。<br>
+      ・表示期間は最新の記録日を含む過去7日間です。<br>      ・縦軸の最小値は目標体重です。<br>
       ・上限は記録されている体重の最大値 +1 kg です。<br>
       ・破線は目標体重です。
     </div>
@@ -239,6 +239,14 @@ function sorted(){return load().sort((a,b)=>a.date.localeCompare(b.date))}
 function getGoal(){const x=localStorage.getItem(G);return x===null?null:Number(x)}
 function shortDate(s){const a=s.split("-");return `${Number(a[1])}/${Number(a[2])}`}
 function jpDate(s){const a=s.split("-");return `${Number(a[1])}月${Number(a[2])}日`}
+function parseDateLocal(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
+function lastSevenDays(data){
+  if(!data.length)return [];
+  const ordered=[...data].sort((a,b)=>a.date.localeCompare(b.date));
+  const latest=parseDateLocal(ordered.at(-1).date);
+  const cutoff=new Date(latest);cutoff.setDate(cutoff.getDate()-6);
+  return ordered.filter(r=>{const dt=parseDateLocal(r.date);return dt>=cutoff&&dt<=latest});
+}
 const sg=getGoal(); if(sg!=null&&Number.isFinite(sg)) goal.value=sg.toFixed(1);
 
 function switchPage(id){
@@ -307,7 +315,7 @@ function prepCanvas(canvas){
 }
 
 function drawCalChart(){
-  const {ctx,W,H}=prepCanvas(cc), rows=sorted().filter(x=>x.calories!=null);
+  const {ctx,W,H}=prepCanvas(cc), rows=lastSevenDays(sorted()).filter(x=>x.calories!=null);
   if(!rows.length){ctx.fillStyle="#78868c";ctx.textAlign="center";ctx.font="14px sans-serif";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
   const p={l:58,r:16,t:28,b:42}, min=500,max=2325, Y=v=>p.t+(max-v)*(H-p.t-p.b)/(max-min);
   const plotW=W-p.l-p.r, step=plotW/Math.max(rows.length,1), X=i=>p.l+step*(i+.5);
@@ -325,18 +333,6 @@ function drawCalChart(){
   ctx.fillStyle="#5d6a70";ctx.textAlign="left";ctx.fillText("kcal",p.l-44,p.t-7);
   ctx.fillStyle="#ff3b30";ctx.textAlign="right";ctx.fillText("基準 2,325",W-p.r,Y(2325)-8);
 
-  const avgCal=rows.reduce((sum,r)=>sum+r.calories,0)/rows.length;
-  if(avgCal>=min && avgCal<=max){
-    const ay=Y(avgCal);
-    ctx.strokeStyle="#0f8b8d";
-    ctx.lineWidth=2;
-    ctx.setLineDash([3,5]);
-    ctx.beginPath();ctx.moveTo(p.l,ay);ctx.lineTo(W-p.r,ay);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle="#0f8b8d";
-    ctx.textAlign="left";
-    ctx.fillText("平均 "+Math.round(avgCal).toLocaleString()+" kcal",p.l+6,ay-8);
-  }
-
   const barW=Math.max(12,Math.min(42,step*.58));
   rows.forEach((r,i)=>{
     const rawTop=Y(Math.max(min,Math.min(max,r.calories))), bottom=Y(min);
@@ -344,13 +340,28 @@ function drawCalChart(){
     ctx.fillRect(X(i)-barW/2,rawTop,barW,Math.max(2,bottom-rawTop));
   });
 
+  const avgCal=rows.reduce((sum,r)=>sum+r.calories,0)/rows.length;
+  if(avgCal>=min && avgCal<=max){
+    const ay=Y(avgCal);
+    ctx.strokeStyle="#0f8b8d";ctx.lineWidth=2.5;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(p.l,ay);ctx.lineTo(W-p.r,ay);ctx.stroke();ctx.setLineDash([]);
+
+    const label="平均 "+Math.round(avgCal).toLocaleString()+" kcal";
+    ctx.font="12px sans-serif";
+    const tx=p.l+8, ty=ay-11, tw=ctx.measureText(label).width+12;
+    ctx.fillStyle="rgba(255,255,255,.96)";
+    ctx.fillRect(tx-5,ty-14,tw,20);
+    ctx.fillStyle="#0f8b8d";ctx.textAlign="left";
+    ctx.fillText(label,tx,ty);
+  }
+
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
   const ids=rows.length<=7?rows.map((_,i)=>i):[0,Math.floor((rows.length-1)/2),rows.length-1];
   [...new Set(ids)].forEach(i=>ctx.fillText(shortDate(rows[i].date),X(i),H-16));
 }
 
 function drawWeightChart(){
-  const {ctx,W,H}=prepCanvas(wc), rows=sorted().filter(x=>x.weight!=null), g=getGoal();
+  const {ctx,W,H}=prepCanvas(wc), rows=lastSevenDays(sorted()).filter(x=>x.weight!=null), g=getGoal();
   if(!rows.length){ctx.fillStyle="#78868c";ctx.textAlign="center";ctx.font="14px sans-serif";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
   const vals=rows.map(x=>x.weight);
   let min=g!=null?g:Math.floor((Math.min(...vals)-1)*10)/10;
