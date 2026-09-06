@@ -179,10 +179,11 @@ canvas{width:100%;height:100%}
 
   <div class="card">
     <div class="toolbar">
-      <button class="secondary" id="csv">CSVバックアップ</button>
+      <button class="secondary" id="csvImportBtn">CSVから復元</button>
+      <input id="csvImportInput" type="file" accept=".csv,text/csv" style="display:none">
       <button class="danger" id="clear">全データ削除</button>
     </div>
-    <div class="note">データはこの端末のブラウザ内に保存されます。定期的にCSVバックアップを取ると安心です。</div>
+    <div class="note">「記録する」をタップするたびに、その日付名のCSVを自動バックアップします。iPhone側の設定により同名ファイルの上書き確認や連番保存になる場合があります。</div>
   </div>
 </section>
 
@@ -346,6 +347,7 @@ document.getElementById("save").onclick=()=>{
   let d=load(),i=d.findIndex(x=>x.date===dt),rec={date:dt,weight:w,calories:c};
   if(i>=0)d[i]=rec;else d.push(rec);
   saveData(d);
+  autoBackupCsv();
   date.value=today();syncDateDisplay();loadRecordForSelectedDate();
   saved.style.display="inline-block";setTimeout(()=>saved.style.display="none",1600);
   render();switchPage("graphs");
@@ -523,12 +525,139 @@ function renderCharts(){
 }
 function render(){renderSummary();renderHistory();if(document.getElementById("graphs").classList.contains("active"))renderCharts()}
 
-document.getElementById("csv").onclick=()=>{
-  const d=sorted();if(!d.length)return alert("データがありません。");
+function autoBackupCsv(){
+  const d=sorted();
+  if(!d.length)return;
+
   const rows=[["date","weight_kg","calories_kcal"],...d.map(x=>[x.date,x.weight??"",x.calories??""])];
-  const csv=rows.map(r=>r.join(",")).join("\n"),blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
-  a.href=url;a.download="weight_calorie_log.csv";a.click();URL.revokeObjectURL(url)
+  const csv=rows.map(r=>r.join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+
+  const now=new Date();
+  const stamp=
+    now.getFullYear()+
+    String(now.getMonth()+1).padStart(2,"0")+
+    String(now.getDate()).padStart(2,"0");
+
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`weight_calorie_log_${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function parseCsvText(text){
+  const rows=[];
+  let row=[],field="",inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(ch==='"'){
+      if(inQuotes && text[i+1]==='"'){field+='"';i++;}
+      else inQuotes=!inQuotes;
+    }else if(ch==="," && !inQuotes){
+      row.push(field);field="";
+    }else if((ch==="\n" || ch==="\r") && !inQuotes){
+      if(ch==="\r" && text[i+1]==="\n")i++;
+      row.push(field);field="";
+      if(row.some(v=>v.trim()!==""))rows.push(row);
+      row=[];
+    }else{
+      field+=ch;
+    }
+  }
+  if(field!=="" || row.length){
+    row.push(field);
+    if(row.some(v=>v.trim()!==""))rows.push(row);
+  }
+  return rows;
+}
+
+function normalizeImportedCsv(text){
+  const rows=parseCsvText(text.replace(/^\uFEFF/,""));
+  if(rows.length<2)throw new Error("CSVに記録がありません。");
+
+  const headers=rows[0].map(x=>x.trim().toLowerCase());
+  const dateIdx=headers.indexOf("date");
+  const weightIdx=headers.indexOf("weight_kg");
+  const calIdx=headers.indexOf("calories_kcal");
+
+  if(dateIdx<0 || weightIdx<0 || calIdx<0){
+    throw new Error("このアプリのCSV形式ではありません。");
+  }
+
+  const imported=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];
+    const dt=(r[dateIdx]??"").trim();
+    const wRaw=(r[weightIdx]??"").trim();
+    const cRaw=(r[calIdx]??"").trim();
+
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dt))continue;
+
+    const w=wRaw===""?null:Number(wRaw);
+    const c=cRaw===""?null:Number(cRaw);
+
+    if(w!==null && (!Number.isFinite(w) || w<=0))continue;
+    if(c!==null && (!Number.isFinite(c) || c<0))continue;
+    if(w===null && c===null)continue;
+
+    imported.push({date:dt,weight:w,calories:c});
+  }
+
+  if(!imported.length)throw new Error("復元できる記録が見つかりませんでした。");
+  return imported;
+}
+
+document.getElementById("csvImportBtn").onclick=()=>{
+  document.getElementById("csvImportInput").click();
 };
+
+document.getElementById("csvImportInput").addEventListener("change",async(e)=>{
+  const input=e.target;
+  const file=input.files && input.files[0];
+  if(!file)return;
+
+  try{
+    const text=await file.text();
+    const imported=normalizeImportedCsv(text);
+
+    const existing=load();
+    const existingDates=new Set(existing.map(r=>r.date));
+    const overwriteCount=imported.filter(r=>existingDates.has(r.date)).length;
+    const newCount=imported.length-overwriteCount;
+
+    const message=
+      `${imported.length}件の記録を読み込みます。\n`+
+      `新規: ${newCount}件\n`+
+      `上書き: ${overwriteCount}件\n\n`+
+      `同じ日付の既存記録はCSVの内容で上書きされます。復元しますか？`;
+
+    if(!confirm(message)){
+      input.value="";
+      return;
+    }
+
+    const map=new Map(existing.map(r=>[r.date,r]));
+    imported.forEach(r=>map.set(r.date,r));
+    const merged=[...map.values()].sort((a,b)=>a.date.localeCompare(b.date));
+    saveData(merged);
+
+    date.value=today();
+    syncDateDisplay();
+    loadRecordForSelectedDate();
+    render();
+
+    alert(`${imported.length}件の記録を復元しました。`);
+  }catch(err){
+    alert("CSVの復元に失敗しました。\n"+(err && err.message ? err.message : "ファイル形式を確認してください。"));
+  }finally{
+    input.value="";
+  }
+});
+
 document.getElementById("clear").onclick=()=>{if(confirm("すべての記録を削除しますか？")){localStorage.removeItem(K);render()}};
 window.addEventListener("resize",()=>{if(graphs.classList.contains("active"))renderCharts()});
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
