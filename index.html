@@ -179,11 +179,11 @@ canvas{width:100%;height:100%}
 
   <div class="card">
     <div class="toolbar">
+      <button class="secondary" id="csvExportBtn">CSVを書き出す</button>
       <button class="secondary" id="csvImportBtn">CSVから復元</button>
       <input id="csvImportInput" type="file" accept=".csv,text/csv" style="display:none">
-      <button class="danger" id="clear">全データ削除</button>
     </div>
-    <div class="note">「記録する」をタップするたびに、その日付名のCSVを自動バックアップします。iPhone側の設定により同名ファイルの上書き確認や連番保存になる場合があります。</div>
+    <div class="note">「記録する」をタップするたびに、アプリ内部へその日のバックアップを自動保存します。同じ日は最新版で上書きされます。CSVは必要なときだけ手動で書き出せます。</div>
   </div>
 </section>
 
@@ -347,7 +347,7 @@ document.getElementById("save").onclick=()=>{
   let d=load(),i=d.findIndex(x=>x.date===dt),rec={date:dt,weight:w,calories:c};
   if(i>=0)d[i]=rec;else d.push(rec);
   saveData(d);
-  autoBackupCsv();
+  saveInternalDailyBackup();
   date.value=today();syncDateDisplay();loadRecordForSelectedDate();
   saved.style.display="inline-block";setTimeout(()=>saved.style.display="none",1600);
   render();switchPage("graphs");
@@ -525,9 +525,31 @@ function renderCharts(){
 }
 function render(){renderSummary();renderHistory();if(document.getElementById("graphs").classList.contains("active"))renderCharts()}
 
-function autoBackupCsv(){
+const BACKUP_KEY="weight_calorie_daily_backups_v1";
+
+function saveInternalDailyBackup(){
   const d=sorted();
   if(!d.length)return;
+
+  let backups={};
+  try{
+    backups=JSON.parse(localStorage.getItem(BACKUP_KEY))||{};
+  }catch{
+    backups={};
+  }
+
+  const backupDate=today();
+  backups[backupDate]={
+    savedAt:new Date().toISOString(),
+    records:d
+  };
+
+  localStorage.setItem(BACKUP_KEY,JSON.stringify(backups));
+}
+
+function exportCsvManually(){
+  const d=sorted();
+  if(!d.length)return alert("書き出すデータがありません。");
 
   const rows=[["date","weight_kg","calories_kcal"],...d.map(x=>[x.date,x.weight??"",x.calories??""])];
   const csv=rows.map(r=>r.join(",")).join("\n");
@@ -611,6 +633,10 @@ function normalizeImportedCsv(text){
   return imported;
 }
 
+document.getElementById("csvExportBtn").onclick=()=>{
+  exportCsvManually();
+};
+
 document.getElementById("csvImportBtn").onclick=()=>{
   document.getElementById("csvImportInput").click();
 };
@@ -658,7 +684,6 @@ document.getElementById("csvImportInput").addEventListener("change",async(e)=>{
   }
 });
 
-document.getElementById("clear").onclick=()=>{if(confirm("すべての記録を削除しますか？")){localStorage.removeItem(K);render()}};
 window.addEventListener("resize",()=>{if(graphs.classList.contains("active"))renderCharts()});
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
 render();
