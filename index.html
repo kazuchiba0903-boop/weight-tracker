@@ -47,6 +47,30 @@ input{
       color:var(--text);
     }
 button{border:0;border-radius:12px;padding:12px 14px;font-size:15px;font-weight:800;cursor:pointer}
+
+.date-nav{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) 44px;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  min-width:0;
+}
+.date-step{
+  width:44px;
+  height:52px;
+  padding:0;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#f7fbfb;
+  color:var(--teal-dark);
+  font-size:22px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.date-step:active{background:#e8f4f3}
 .date-field{
   position:relative;
   width:100%;
@@ -157,9 +181,13 @@ canvas{width:100%;height:100%}
     <div class="grid grid3">
       <div>
         <label for="date">日付</label>
-        <div class="date-field">
-          <span id="dateDisplay" class="date-display"></span>
-          <input id="date" class="date-native" type="date" aria-label="日付">
+        <div class="date-nav">
+          <button type="button" class="date-step" id="prevDate" aria-label="前日">◀︎</button>
+          <div class="date-field">
+            <span id="dateDisplay" class="date-display"></span>
+            <input id="date" class="date-native" type="date" aria-label="日付">
+          </div>
+          <button type="button" class="date-step" id="nextDate" aria-label="翌日">▶︎</button>
         </div>
       </div>
       <div><label for="weight">体重 (kg)</label><input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="例 67.8"></div>
@@ -249,6 +277,19 @@ function displayDate(s){
   return `${a[0]}/${a[1]}/${a[2]}`;
 }
 function syncDateDisplay(){ dateDisplay.textContent=displayDate(date.value); }
+function shiftSelectedDate(days){
+  if(!date.value)date.value=today();
+  const parts=date.value.split("-").map(Number);
+  const dt=new Date(parts[0],parts[1]-1,parts[2]);
+  dt.setDate(dt.getDate()+days);
+  date.value=
+    dt.getFullYear()+"-"+
+    String(dt.getMonth()+1).padStart(2,"0")+"-"+
+    String(dt.getDate()).padStart(2,"0");
+  syncDateDisplay();
+  loadRecordForSelectedDate();
+}
+
 
 date.value=today();
 syncDateDisplay();
@@ -257,6 +298,9 @@ date.addEventListener("change",()=>{
   syncDateDisplay();
   loadRecordForSelectedDate();
 });
+document.getElementById("prevDate").addEventListener("click",()=>shiftSelectedDate(-1));
+document.getElementById("nextDate").addEventListener("click",()=>shiftSelectedDate(1));
+
 
 function load(){try{return JSON.parse(localStorage.getItem(K))||[]}catch{return[]}}
 function saveData(d){localStorage.setItem(K,JSON.stringify(d))}
