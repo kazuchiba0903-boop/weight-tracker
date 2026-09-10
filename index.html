@@ -583,8 +583,8 @@ function drawCalChart(){
     const y=Y(v);
     const isBase=v===calBase;
     const isMax=v===max;
-    ctx.strokeStyle=isBase?"#ff3b30":(isMax?"#65747b":"#9aa8ad");
-    ctx.setLineDash(isBase?[7,5]:(isMax?[]:[6,5]));
+    ctx.strokeStyle=isBase?"#ff3b30":(isMax?"#2f80ed":"#9aa8ad");
+    ctx.setLineDash(isBase?[7,5]:(isMax?[5,4]:[6,5]));
     ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();ctx.setLineDash([]);
   });
 
@@ -599,11 +599,7 @@ function drawCalChart(){
   calAxis.ctx.textAlign="left";
   calAxis.ctx.fillText("kcal",8,p.t-7);
   ctx.fillStyle="#ff3b30";ctx.textAlign="right";ctx.fillText("基準 "+calBase.toLocaleString(),W-p.r,Y(calBase)-8);
-  if(max!==calBase){
-    ctx.fillStyle="#65747b";
-    ctx.textAlign="right";
-    ctx.fillText("上限 "+max.toLocaleString(),W-p.r,Y(max)+14);
-  }
+
 
   const barW=Math.max(12,Math.min(42,step*.58));
   rows.forEach((r,i)=>{
