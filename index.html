@@ -125,6 +125,31 @@ button{border:0;border-radius:12px;padding:12px 14px;font-size:15px;font-weight:
 .secondary{background:#e9f4f3;color:var(--teal-dark)}.danger{background:#fff0ef;color:#c62828}
 .goalrow{display:flex;gap:10px;align-items:end}.goalrow>div{flex:1}
 .note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px}
+
+.cal-ref-nav{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) 44px;
+  gap:8px;
+  align-items:center;
+  margin:0 0 10px;
+}
+.cal-ref-btn{
+  width:44px;
+  height:40px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#f4fbfa;
+  color:var(--teal-dark);
+  font-size:20px;
+  padding:0;
+}
+.cal-ref-btn:disabled{opacity:.28}
+.cal-ref-date{
+  text-align:center;
+  font-weight:800;
+  color:var(--teal-dark);
+  font-size:15px;
+}
 .summary{display:grid;grid-template-columns:1fr;gap:0;background:linear-gradient(180deg,#f0fbfa,#eef7f7);border-radius:14px;padding:12px;margin-bottom:14px}
 .metric{padding:8px 10px;text-align:center;border-bottom:1px solid #d8e8e6}.metric:last-child{border-bottom:0}
 .metric .label{font-size:13px;color:#58666d;margin-bottom:4px}.metric .value{font-size:25px;font-weight:900}.metric .sub{font-size:12px;color:#58666d;margin-top:3px}
@@ -218,8 +243,13 @@ canvas{width:100%;height:100%}
 <section id="graphs" class="page">
   <div class="card">
     <h2 class="card-title"><span class="icon">▥</span>摂取カロリー</h2>
+    <div class="cal-ref-nav">
+      <button class="cal-ref-btn" id="prevCalRef" type="button" aria-label="前の記録日">◀︎</button>
+      <div class="cal-ref-date" id="calRefDate">—</div>
+      <button class="cal-ref-btn" id="nextCalRef" type="button" aria-label="次の記録日">▶︎</button>
+    </div>
     <div class="summary">
-      <div class="metric"><div class="label">最新の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
+      <div class="metric"><div class="label">参照日の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
       <div class="metric"><div class="label">基準との差</div><div class="value blue" id="calDiff">—</div><div class="sub">基準 2,325 kcal</div></div>
       <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub">2,325 kcal に対して</div></div>
       <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">最新日の差を体重換算</div></div>
@@ -397,10 +427,43 @@ document.getElementById("save").onclick=()=>{
   render();switchPage("graphs");
 };
 
+
+let calorieRefIndex=null;
+
+function calorieRecords(){
+  return sorted().filter(r=>r.calories!=null);
+}
+
+function ensureCalorieRef(){
+  const cs=calorieRecords();
+  if(!cs.length){
+    calorieRefIndex=null;
+    return;
+  }
+  if(calorieRefIndex===null || calorieRefIndex<0 || calorieRefIndex>=cs.length){
+    calorieRefIndex=cs.length-1;
+  }
+}
+
+function shiftCalorieRef(delta){
+  const cs=calorieRecords();
+  if(!cs.length)return;
+  ensureCalorieRef();
+  calorieRefIndex=Math.max(0,Math.min(cs.length-1,calorieRefIndex+delta));
+  renderSummary();
+}
+
 function renderSummary(){
   const d=sorted();
   const ws=d.filter(x=>x.weight!=null),cs=d.filter(x=>x.calories!=null);
-  const lw=ws.at(-1),pw=ws.at(-2),lc=cs.at(-1),g=getGoal();
+  const lw=ws.at(-1),pw=ws.at(-2),g=getGoal();
+
+  ensureCalorieRef();
+  const lc=(calorieRefIndex!==null && cs.length)?cs[calorieRefIndex]:null;
+
+  calRefDate.textContent=lc?jpDate(lc.date):"—";
+  prevCalRef.disabled=!lc || calorieRefIndex<=0;
+  nextCalRef.disabled=!lc || calorieRefIndex>=cs.length-1;
 
   latestCal.textContent=lc?Math.round(lc.calories).toLocaleString()+" kcal":"—";
   latestCalDate.textContent=lc?jpDate(lc.date):"";
@@ -567,6 +630,9 @@ function renderCharts(){
     weightChartScroll.scrollLeft=weightChartScroll.scrollWidth;
   });
 }
+document.getElementById("prevCalRef").addEventListener("click",()=>shiftCalorieRef(-1));
+document.getElementById("nextCalRef").addEventListener("click",()=>shiftCalorieRef(1));
+
 function render(){renderSummary();renderHistory();if(document.getElementById("graphs").classList.contains("active"))renderCharts()}
 
 const BACKUP_KEY="weight_calorie_daily_backups_v1";
