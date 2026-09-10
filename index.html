@@ -21,7 +21,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
 header{background:linear-gradient(135deg,#1f7e79,#146b68);color:white;padding:calc(12px + env(safe-area-inset-top)) 18px 14px;position:sticky;top:0;z-index:10}
 .headrow{display:flex;align-items:center;justify-content:space-between;max-width:980px;margin:auto}
 header h1{font-size:22px;margin:0;font-weight:800;letter-spacing:.01em}
-.gear{font-size:23px;opacity:.95}
+.gear{font-size:23px;opacity:.95;cursor:pointer;background:transparent;border:0;color:#fff;padding:4px 6px}
 .tabs{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:calc(58px + env(safe-area-inset-top));z-index:9}
 .tabs-inner{max-width:980px;margin:auto;display:grid;grid-template-columns:repeat(3,1fr)}
 .tab{padding:13px 8px 11px;text-align:center;font-weight:700;color:#58666d;border-bottom:3px solid transparent;cursor:pointer}
@@ -182,6 +182,13 @@ canvas{width:100%;height:100%}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:12}
 .bottom-nav button{background:transparent;color:#5c696f;padding:5px 0;font-size:12px}.bottom-nav button.active{color:var(--teal-dark)}
 .bottom-nav .bicon{display:block;font-size:20px;margin-bottom:2px}
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:30;display:none;align-items:flex-end;justify-content:center}
+.settings-overlay.open{display:flex}
+.settings-panel{width:100%;max-width:760px;max-height:86vh;overflow:auto;background:#f7fbfb;border-radius:22px 22px 0 0;padding:14px 14px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.18)}
+.settings-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.settings-head h2{margin:0;font-size:21px}.close-settings{width:38px;height:38px;border-radius:50%;background:#e8f2f1;color:var(--teal-dark);padding:0;font-size:22px}
+.settings-section{background:#fff;border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}.settings-section h3{margin:0 0 10px;font-size:16px}.settings-actions{display:flex;gap:8px;flex-wrap:wrap}
+
 @media(min-width:720px){
   .grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
   .summary{grid-template-columns:repeat(4,1fr)}
@@ -191,7 +198,7 @@ canvas{width:100%;height:100%}
 </style>
 </head>
 <body>
-<header><div class="headrow"><h1>体重・カロリー記録</h1><div class="gear">⚙︎</div></div></header>
+<header><div class="headrow"><h1>体重・カロリー記録</h1><button class="gear" id="openSettingsBtn" type="button" aria-label="設定">⚙︎</button></div></header>
 
 <nav class="tabs"><div class="tabs-inner">
   <div class="tab active" data-page="input">✎ 入力</div>
@@ -222,22 +229,6 @@ canvas{width:100%;height:100%}
     <div id="saved" class="saved" style="display:none">保存しました</div>
   </div>
 
-  <div class="card">
-    <h2 class="card-title"><span class="icon">◎</span>目標体重</h2>
-    <div class="goalrow">
-      <div><label for="goal">目標体重 (kg)</label><input id="goal" type="number" inputmode="decimal" step="0.1" placeholder="例 65.0"></div>
-      <button class="secondary" id="saveGoal">保存</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="toolbar">
-      <button class="secondary" id="csvExportBtn">CSVを書き出す</button>
-      <button class="secondary" id="csvImportBtn">CSVから復元</button>
-      <input id="csvImportInput" type="file" accept=".csv,text/csv" style="display:none">
-    </div>
-    <div class="note">「記録する」をタップするたびに、アプリ内部へその日のバックアップを自動保存します。同じ日は最新版で上書きされます。CSVは必要なときだけ手動で書き出せます。</div>
-  </div>
 </section>
 
 <section id="graphs" class="page">
@@ -250,8 +241,8 @@ canvas{width:100%;height:100%}
     </div>
     <div class="summary">
       <div class="metric"><div class="label">参照日の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
-      <div class="metric"><div class="label">基準との差</div><div class="value blue" id="calDiff">—</div><div class="sub">基準 2,325 kcal</div></div>
-      <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub">2,325 kcal に対して</div></div>
+      <div class="metric"><div class="label">基準との差</div><div class="value blue" id="calDiff">—</div><div class="sub" id="calBaseSub">—</div></div>
+      <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub" id="calRateSub">—</div></div>
       <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">最新日の差を体重換算</div></div>
     </div>
     <div class="chart-shell"><div class="y-axis-fixed"><canvas id="ccAxis"></canvas></div><div class="chart" id="calChartScroll"><canvas id="cc"></canvas></div></div>
@@ -287,6 +278,46 @@ canvas{width:100%;height:100%}
 </section>
 </main>
 
+
+<div class="settings-overlay" id="settingsOverlay" aria-hidden="true">
+  <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="settings-head"><h2 id="settingsTitle">設定</h2><button class="close-settings" id="closeSettingsBtn" type="button" aria-label="閉じる">×</button></div>
+    <div class="settings-section">
+      <h3>基準カロリー</h3>
+      <label for="calorieBaseInput">基準カロリー (kcal)</label>
+      <input id="calorieBaseInput" type="number" inputmode="numeric" step="1" min="500" max="6000" placeholder="例 2325">
+      <button class="primary" id="saveCalorieBase" type="button">保存</button>
+      <div class="note">グラフの基準線、基準との差、達成率、差÷7200の計算に使用します。</div>
+    </div>
+
+    <div class="settings-section">
+      <h3>グラフ表示範囲</h3>
+      <label for="calorieGraphMaxInput">摂取カロリーグラフの上限 (kcal)</label>
+      <input id="calorieGraphMaxInput" type="number" inputmode="numeric" step="100" min="600" max="10000" placeholder="例 3000">
+      <label for="weightGraphMaxInput" style="margin-top:12px">体重グラフの上限 (kg)</label>
+      <input id="weightGraphMaxInput" type="number" inputmode="decimal" step="0.1" min="20" max="300" placeholder="例 75.0">
+      <button class="primary" id="saveGraphMax" type="button">保存</button>
+      <div class="note">空欄で保存すると、それぞれ自動設定に戻ります。</div>
+    </div>
+    <div class="settings-section">
+      <h3>目標体重</h3>
+      <label for="goal">目標体重 (kg)</label>
+      <input id="goal" type="number" inputmode="decimal" step="0.1" min="20" max="300" placeholder="例 65.0">
+      <button class="primary" id="saveGoal" type="button">保存</button>
+      <div class="note">未設定でも使用できます。空欄で保存すると解除します。</div>
+    </div>
+    <div class="settings-section">
+      <h3>バックアップ</h3>
+      <div class="settings-actions">
+        <button class="secondary" id="csvExportBtn" type="button">CSVを書き出す</button>
+        <button class="secondary" id="csvImportBtn" type="button">CSVから復元</button>
+        <input id="csvImportInput" type="file" accept=".csv,text/csv" style="display:none">
+      </div>
+      <div class="note">「記録する」たびにアプリ内部にも日次バックアップを保存しています。</div>
+    </div>
+  </div>
+</div>
+
 <div class="bottom-nav">
   <button class="active" data-page="input"><span class="bicon">✎</span>入力</button>
   <button data-page="graphs"><span class="bicon">▥</span>グラフ</button>
@@ -294,7 +325,7 @@ canvas{width:100%;height:100%}
 </div>
 
 <script>
-const K="weight_calorie_tracker_v3", G="weight_calorie_goal_v3", CAL_BASE=2325;
+const K="weight_calorie_tracker_v3", G="weight_calorie_goal_v3", CAL_BASE_KEY="weight_calorie_base_v1", CAL_GRAPH_MAX_KEY="weight_calorie_graph_max_v1", WEIGHT_GRAPH_MAX_KEY="weight_weight_graph_max_v1";
 const date=document.getElementById("date"),dateDisplay=document.getElementById("dateDisplay"),weight=document.getElementById("weight"),cal=document.getElementById("cal"),goal=document.getElementById("goal");
 
 function today(){
@@ -336,6 +367,7 @@ function load(){try{return JSON.parse(localStorage.getItem(K))||[]}catch{return[
 function saveData(d){localStorage.setItem(K,JSON.stringify(d))}
 function sorted(){return load().sort((a,b)=>a.date.localeCompare(b.date))}
 function getGoal(){const x=localStorage.getItem(G);return x===null?null:Number(x)}
+function getCalBase(){const x=localStorage.getItem(CAL_BASE_KEY);const n=x===null?2325:Number(x);return Number.isFinite(n)&&n>0?n:2325}
 function loadRecordForSelectedDate(){
   const dt=date.value;
   if(!dt){
@@ -352,6 +384,13 @@ function loadRecordForSelectedDate(){
     cal.value="";
   }
 }
+function getGraphMax(key){
+  const x=localStorage.getItem(key);
+  if(x===null)return null;
+  const n=Number(x);
+  return Number.isFinite(n)?n:null;
+}
+
 function shortDate(s){const a=s.split("-");return `${Number(a[1])}/${Number(a[2])}`}
 function jpDate(s){const a=s.split("-");return `${Number(a[1])}月${Number(a[2])}日`}
 function parseDateLocal(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
@@ -396,6 +435,7 @@ function prepareAxisCanvas(canvas){
 
 
 const sg=getGoal(); if(sg!=null&&Number.isFinite(sg)) goal.value=sg.toFixed(1);
+calorieBaseInput.value=String(getCalBase());
 
 function switchPage(id){
   document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id));
@@ -406,14 +446,40 @@ function switchPage(id){
 document.querySelectorAll("[data-page]").forEach(x=>x.addEventListener("click",()=>switchPage(x.dataset.page)));
 
 document.getElementById("saveGoal").onclick=()=>{
-  if(goal.value===""){localStorage.removeItem(G)}else{
-    const g=Number(goal.value);
-    if(!Number.isFinite(g)||g<20||g>300)return alert("目標体重を正しく入力してください。");
-    localStorage.setItem(G,String(g));
-  }
-  render();
+  if(goal.value===""){localStorage.removeItem(G)}else{const g=Number(goal.value);if(!Number.isFinite(g)||g<20||g>300)return alert("目標体重を正しく入力してください。");localStorage.setItem(G,String(g))}
+  render();alert("目標体重を保存しました。");
 };
 
+
+document.getElementById("saveGraphMax").onclick=()=>{
+  const c=calorieGraphMaxInput.value.trim(),w=weightGraphMaxInput.value.trim();
+  if(c==="")localStorage.removeItem(CAL_GRAPH_MAX_KEY);
+  else{
+    const v=Number(c);
+    if(!Number.isFinite(v)||v<600||v>10000)return alert("カロリーグラフ上限を600〜10000 kcalで入力してください。");
+    localStorage.setItem(CAL_GRAPH_MAX_KEY,String(Math.round(v)));
+  }
+  if(w==="")localStorage.removeItem(WEIGHT_GRAPH_MAX_KEY);
+  else{
+    const v=Number(w);
+    if(!Number.isFinite(v)||v<20||v>300)return alert("体重グラフ上限を20〜300 kgで入力してください。");
+    localStorage.setItem(WEIGHT_GRAPH_MAX_KEY,String(v));
+  }
+  render();
+  alert("グラフの上限を保存しました。");
+};
+
+document.getElementById("saveCalorieBase").onclick=()=>{
+  const v=Number(calorieBaseInput.value);
+  if(!Number.isFinite(v)||v<500||v>6000)return alert("基準カロリーを500〜6000 kcalの範囲で入力してください。");
+  localStorage.setItem(CAL_BASE_KEY,String(Math.round(v)));
+  calorieBaseInput.value=String(Math.round(v));render();alert("基準カロリーを保存しました。");
+};
+function openSettings(){settingsOverlay.classList.add("open");settingsOverlay.setAttribute("aria-hidden","false");calorieBaseInput.value=String(getCalBase());const g=getGoal();goal.value=g!=null?g.toFixed(1):""}
+function closeSettings(){settingsOverlay.classList.remove("open");settingsOverlay.setAttribute("aria-hidden","true")}
+document.getElementById("openSettingsBtn").addEventListener("click",openSettings);
+document.getElementById("closeSettingsBtn").addEventListener("click",closeSettings);
+settingsOverlay.addEventListener("click",e=>{if(e.target===settingsOverlay)closeSettings()});
 document.getElementById("save").onclick=()=>{
   const dt=date.value,w=weight.value===""?null:Number(weight.value),c=cal.value===""?null:Number(cal.value);
   if(!dt)return alert("日付を入力してください。");
@@ -465,12 +531,16 @@ function renderSummary(){
   prevCalRef.disabled=!lc || calorieRefIndex<=0;
   nextCalRef.disabled=!lc || calorieRefIndex>=cs.length-1;
 
+  const currentCalBase=getCalBase();
+  calBaseSub.textContent="基準 "+currentCalBase.toLocaleString()+" kcal";
+  calRateSub.textContent=currentCalBase.toLocaleString()+" kcal に対して";
   latestCal.textContent=lc?Math.round(lc.calories).toLocaleString()+" kcal":"—";
   latestCalDate.textContent=lc?jpDate(lc.date):"";
   if(lc){
-    const z=lc.calories-CAL_BASE;
+    const calBase=getCalBase();
+    const z=lc.calories-calBase;
     calDiff.textContent=(z>0?"+":"")+Math.round(z).toLocaleString()+" kcal";
-    calRate.textContent=(lc.calories/CAL_BASE*100).toFixed(1)+" %";
+    calRate.textContent=(lc.calories/calBase*100).toFixed(1)+" %";
 
     const kg=z/7200;
     calKg.textContent=(kg>0?"+":"")+kg.toFixed(2)+" kg";
@@ -499,15 +569,17 @@ function prepCanvas(canvas){
 function drawCalChart(){
   const rows=chartRowsWithValue("calories"), {ctx,W,H}=prepareScrollableCanvas(cc,calChartScroll,rows.length);
   if(!rows.length){ctx.fillStyle="#78868c";ctx.textAlign="center";ctx.font="14px sans-serif";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
-  const p={l:58,r:16,t:28,b:42}, min=500,max=2325, Y=v=>p.t+(max-v)*(H-p.t-p.b)/(max-min);
+  const calBase=getCalBase();
+  const customCalMax=getGraphMax(CAL_GRAPH_MAX_KEY);
+  const p={l:58,r:16,t:28,b:42}, min=500,max=Math.max(501,customCalMax??calBase,calBase), Y=v=>p.t+(max-v)*(H-p.t-p.b)/(max-min);
   const plotW=W-p.l-p.r, step=plotW/Math.max(rows.length,1), X=i=>p.l+step*(i+.5);
-  const levels=[2325,2000,1500,1000,500];
+  const levels=[calBase,2000,1500,1000,500].filter((v,i,a)=>v>=min&&v<=max&&a.indexOf(v)===i).sort((a,b)=>b-a);
 
   ctx.font="12px sans-serif";ctx.lineWidth=1;
   levels.forEach(v=>{
     const y=Y(v);
-    ctx.strokeStyle=v===2325?"#ff3b30":"#9aa8ad";
-    ctx.setLineDash(v===2325?[7,5]:[6,5]);
+    ctx.strokeStyle=v===calBase?"#ff3b30":"#9aa8ad";
+    ctx.setLineDash(v===calBase?[7,5]:[6,5]);
     ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();ctx.setLineDash([]);
   });
 
@@ -521,7 +593,7 @@ function drawCalChart(){
   calAxis.ctx.fillStyle="#5d6a70";
   calAxis.ctx.textAlign="left";
   calAxis.ctx.fillText("kcal",8,p.t-7);
-  ctx.fillStyle="#ff3b30";ctx.textAlign="right";ctx.fillText("基準 2,325",W-p.r,Y(2325)-8);
+  ctx.fillStyle="#ff3b30";ctx.textAlign="right";ctx.fillText("基準 "+calBase.toLocaleString(),W-p.r,Y(calBase)-8);
 
   const barW=Math.max(12,Math.min(42,step*.58));
   rows.forEach((r,i)=>{
@@ -571,7 +643,9 @@ function drawWeightChart(){
   if(!rows.length){ctx.fillStyle="#78868c";ctx.textAlign="center";ctx.font="14px sans-serif";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
   const vals=rows.map(x=>x.weight);
   let min=g!=null?g:Math.floor((Math.min(...vals)-1)*10)/10;
-  let max=Math.max(...vals)+1;
+  const autoMax=Math.max(...vals)+1;
+  const customWeightMax=getGraphMax(WEIGHT_GRAPH_MAX_KEY);
+  let max=customWeightMax??autoMax;
   if(max<=min)max=min+1;
   const p={l:54,r:16,t:28,b:42},Y=v=>p.t+(max-v)*(H-p.t-p.b)/(max-min);
   const plotW=W-p.l-p.r,step=plotW/Math.max(rows.length-1,1),X=i=>rows.length===1?p.l+plotW/2:p.l+step*i;
