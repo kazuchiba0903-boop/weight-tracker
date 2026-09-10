@@ -242,15 +242,14 @@ canvas{width:100%;height:100%}
     <div class="summary">
       <div class="metric"><div class="label">参照日の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
       <div class="metric"><div class="label">基準との差</div><div class="value blue" id="calDiff">—</div><div class="sub" id="calBaseSub">—</div></div>
-      <div class="metric"><div class="label">基準達成率</div><div class="value" id="calRate">—</div><div class="sub" id="calRateSub">—</div></div>
-      <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">最新日の差を体重換算</div></div>
+      <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">参照日の差を体重換算</div></div>
     </div>
     <div class="chart-shell"><div class="y-axis-fixed"><canvas id="ccAxis"></canvas></div><div class="chart" id="calChartScroll"><canvas id="cc"></canvas></div></div>
     <div class="legend-note">
-      ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>      ・縦軸は 500〜2,325 kcal で表示します。<br>
-      ・赤い破線は基準カロリー 2,325 kcal です。<br>
-      ・青緑の点線は最新の記録日を含む過去7日間の棒グラフ上だけに表示します。<br>
-      ・主な目安線として 2,000 / 1,500 / 1,000 kcal を表示します。
+      ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>
+      ・縦軸は500 kcalを最小値とし、500 kcal刻みの目安線と設定した上限値を表示します。<br>
+      ・青い点線は設定したグラフ上限、赤い点線は設定した基準カロリーです。<br>
+      ・青緑の点線は最新の記録日を含む過去7日間の平均摂取カロリーです。
     </div>
   </div>
 
@@ -263,9 +262,10 @@ canvas{width:100%;height:100%}
     </div>
     <div class="chart-shell"><div class="y-axis-fixed"><canvas id="wcAxis"></canvas></div><div class="chart" id="weightChartScroll"><canvas id="wc"></canvas></div></div>
     <div class="legend-note">
-      ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>      ・縦軸の最小値は目標体重です。<br>
-      ・上限は記録されている体重の最大値 +1 kg です。<br>
-      ・破線は目標体重です。
+      ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>
+      ・縦軸の上限は設定画面から変更できます。空欄の場合は、記録されている最大体重＋1 kgで自動設定します。<br>
+      ・目標体重を設定している場合は縦軸の最小値になり、目標体重の破線を表示します。<br>
+      ・目標体重が未設定の場合は、記録されている最小体重より少し低い値を自動で最小値にします。
     </div>
   </div>
 </section>
@@ -287,7 +287,7 @@ canvas{width:100%;height:100%}
       <label for="calorieBaseInput">基準カロリー (kcal)</label>
       <input id="calorieBaseInput" type="number" inputmode="numeric" step="1" min="500" max="6000" placeholder="例 2325">
       <button class="primary" id="saveCalorieBase" type="button">保存</button>
-      <div class="note">グラフの基準線、基準との差、達成率、差÷7200の計算に使用します。</div>
+      <div class="note">グラフの基準線、基準との差、差÷7200の計算に使用します。</div>
     </div>
 
     <div class="settings-section">
@@ -533,20 +533,17 @@ function renderSummary(){
 
   const currentCalBase=getCalBase();
   calBaseSub.textContent="基準 "+currentCalBase.toLocaleString()+" kcal";
-  calRateSub.textContent=currentCalBase.toLocaleString()+" kcal に対して";
   latestCal.textContent=lc?Math.round(lc.calories).toLocaleString()+" kcal":"—";
   latestCalDate.textContent=lc?jpDate(lc.date):"";
   if(lc){
     const calBase=getCalBase();
     const z=lc.calories-calBase;
     calDiff.textContent=(z>0?"+":"")+Math.round(z).toLocaleString()+" kcal";
-    calRate.textContent=(lc.calories/calBase*100).toFixed(1)+" %";
 
     const kg=z/7200;
     calKg.textContent=(kg>0?"+":"")+kg.toFixed(2)+" kg";
   }else{
     calDiff.textContent="—";
-    calRate.textContent="—";
     calKg.textContent="—";
   }
 
@@ -581,12 +578,22 @@ function drawCalChart(){
   ctx.font="12px sans-serif";ctx.lineWidth=1;
   levels.forEach(v=>{
     const y=Y(v);
-    const isBase=v===calBase;
     const isMax=v===max;
-    ctx.strokeStyle=isBase?"#ff3b30":(isMax?"#2f80ed":"#9aa8ad");
-    ctx.setLineDash(isBase?[7,5]:(isMax?[5,4]:[6,5]));
+    ctx.strokeStyle=isMax?"#2f80ed":"#9aa8ad";
+    ctx.setLineDash(isMax?[5,4]:[6,5]);
     ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();ctx.setLineDash([]);
   });
+
+  // 基準カロリーの赤い点線は目安線とは別に必ず描画する
+  if(calBase>=min && calBase<=max){
+    const baseY=Y(calBase);
+    ctx.strokeStyle="#ff3b30";
+    ctx.lineWidth=2;
+    ctx.setLineDash([7,5]);
+    ctx.beginPath();ctx.moveTo(p.l,baseY);ctx.lineTo(W-p.r,baseY);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth=1;
+  }
 
   const calAxis=prepareAxisCanvas(ccAxis);
   calAxis.ctx.font="12px sans-serif";
