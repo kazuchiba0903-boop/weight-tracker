@@ -179,7 +179,7 @@ canvas{width:100%;height:100%}
 .row:first-child{border-top:0}.muted{font-size:14px;color:var(--muted);line-height:1.5}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .empty{text-align:center;color:var(--muted);padding:22px}
 .saved{display:inline-block;margin-top:9px;background:#e7f6f4;color:var(--teal-dark);padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:12}
+.bottom-nav{position:fixed;bottom:calc(-1 * env(safe-area-inset-bottom));left:0;right:0;background:rgba(255,255,255,.96);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:12}
 .bottom-nav button{background:transparent;color:#5c696f;padding:5px 0;font-size:12px}.bottom-nav button.active{color:var(--teal-dark)}
 .bottom-nav .bicon{display:block;font-size:20px;margin-bottom:2px}
 .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:30;display:none;align-items:flex-end;justify-content:center}
@@ -194,6 +194,17 @@ canvas{width:100%;height:100%}
   .summary{grid-template-columns:repeat(4,1fr)}
   .metric{border-bottom:0;border-right:1px solid #d8e8e6}.metric:last-child{border-right:0}
   .bottom-nav{display:none}
+}
+
+.cal-ref-today{
+  border:1px solid var(--teal);
+  background:#fff;
+  color:var(--teal-dark);
+  border-radius:10px;
+  padding:7px 11px;
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
 }
 </style>
 </head>
@@ -238,6 +249,7 @@ canvas{width:100%;height:100%}
       <button class="cal-ref-btn" id="prevCalRef" type="button" aria-label="前の記録日">◀︎</button>
       <div class="cal-ref-date" id="calRefDate">—</div>
       <button class="cal-ref-btn" id="nextCalRef" type="button" aria-label="次の記録日">▶︎</button>
+      <button class="cal-ref-today" id="todayCalRef" type="button">今日</button>
     </div>
     <div class="summary">
       <div class="metric"><div class="label">参照日の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
@@ -519,6 +531,19 @@ function shiftCalorieRef(delta){
   renderSummary();
 }
 
+function goTodayCalRef(){
+  const cs=calorieRecords();
+  if(!cs.length)return;
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=String(now.getMonth()+1).padStart(2,"0");
+  const d=String(now.getDate()).padStart(2,"0");
+  const today=`${y}-${m}-${d}`;
+  const idx=cs.findIndex(r=>r.date===today);
+  calorieRefIndex=idx>=0?idx:cs.length-1;
+  renderSummary();
+}
+
 function renderSummary(){
   const d=sorted();
   const ws=d.filter(x=>x.weight!=null),cs=d.filter(x=>x.calories!=null);
@@ -719,6 +744,7 @@ function renderCharts(){
 }
 document.getElementById("prevCalRef").addEventListener("click",()=>shiftCalorieRef(-1));
 document.getElementById("nextCalRef").addEventListener("click",()=>shiftCalorieRef(1));
+document.getElementById("todayCalRef").addEventListener("click",goTodayCalRef);
 
 function render(){renderSummary();renderHistory();if(document.getElementById("graphs").classList.contains("active"))renderCharts()}
 
