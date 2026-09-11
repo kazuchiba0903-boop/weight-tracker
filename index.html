@@ -924,6 +924,51 @@ document.getElementById("csvImportInput").addEventListener("change",async(e)=>{
 window.addEventListener("resize",()=>{if(graphs.classList.contains("active"))renderCharts()});
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
 render();
+
+// v5.9: swipe left/right to switch between Input / Graph / History
+(() => {
+  const order=["input","graphs","history"];
+  let startX=0,startY=0,startTarget=null;
+
+  document.addEventListener("touchstart",(e)=>{
+    if(e.touches.length!==1)return;
+    startX=e.touches[0].clientX;
+    startY=e.touches[0].clientY;
+    startTarget=e.target;
+  },{passive:true});
+
+  document.addEventListener("touchend",(e)=>{
+    if(!startTarget || e.changedTouches.length!==1)return;
+
+    // Don't hijack form controls, buttons, date inputs, settings, or horizontally-scrollable charts.
+    if(startTarget.closest("input,button,select,textarea,.settings-overlay,.chart-scroll,.scroll-wrap,.canvas-scroll")){
+      startTarget=null;
+      return;
+    }
+
+    const endX=e.changedTouches[0].clientX;
+    const endY=e.changedTouches[0].clientY;
+    const dx=endX-startX;
+    const dy=endY-startY;
+
+    startTarget=null;
+
+    // Require a deliberate mostly-horizontal swipe.
+    if(Math.abs(dx)<70 || Math.abs(dx)<Math.abs(dy)*1.25)return;
+
+    const active=document.querySelector(".page.active");
+    if(!active)return;
+    const i=order.indexOf(active.id);
+    if(i<0)return;
+
+    if(dx<0 && i<order.length-1){
+      switchPage(order[i+1]);
+    }else if(dx>0 && i>0){
+      switchPage(order[i-1]);
+    }
+  },{passive:true});
+})();
+
 </script>
 </body>
 </html>
