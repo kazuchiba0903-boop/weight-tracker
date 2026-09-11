@@ -181,7 +181,7 @@ canvas{width:100%;height:100%}
 .row:first-child{border-top:0}.muted{font-size:14px;color:var(--muted);line-height:1.5}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .empty{text-align:center;color:var(--muted);padding:22px}
 .saved{display:inline-block;margin-top:9px;background:#e7f6f4;color:var(--teal-dark);padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 calc(10px + env(safe-area-inset-bottom));z-index:12}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:12}
 .bottom-nav button{background:transparent;color:#5c696f;padding:5px 0;font-size:12px}.bottom-nav button.active{color:var(--teal-dark)}
 .bottom-nav .bicon{display:block;font-size:20px;margin-bottom:2px}
 .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:30;display:none;align-items:flex-end;justify-content:center}
@@ -221,14 +221,6 @@ canvas{width:100%;height:100%}
 
 
 
-/* v5.7: input page bottom bar height matched to the graph page */
-@media(max-width:719px){
-  .bottom-nav.input-page-nav{
-    height:104px;
-    box-sizing:border-box;
-    padding:8px 0 10px;
-  }
-}
 </style>
 </head>
 <body>
@@ -352,7 +344,7 @@ canvas{width:100%;height:100%}
   </div>
 </div>
 
-<div class="bottom-nav input-page-nav">
+<div class="bottom-nav">
   <button class="active" data-page="input"><span class="bicon">✎</span>入力</button>
   <button data-page="graphs"><span class="bicon">▥</span>グラフ</button>
   <button data-page="history"><span class="bicon">☷</span>履歴</button>
@@ -474,7 +466,6 @@ calorieBaseInput.value=String(getCalBase());
 function switchPage(id){
   document.querySelectorAll(".page").forEach(x=>x.classList.toggle("active",x.id===id));
   document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===id));
-  document.querySelector(".bottom-nav").classList.toggle("input-page-nav",id==="input");
   if(id==="graphs"){setTimeout(renderCharts,40)}
   window.scrollTo({top:0,behavior:"smooth"});
 }
