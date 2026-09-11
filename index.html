@@ -11,13 +11,15 @@
 <link rel="apple-touch-icon" href="./icon-180.png">
 <title>体重・カロリー記録</title>
 <style>
+html{background:#fff;min-height:100%;}
+
 :root{
   --bg:#f3f7f7;--card:#fff;--text:#162126;--muted:#67757c;--border:#dfe8e8;
   --teal:#0f8b8d;--teal-dark:#146b68;--teal-soft:#eef8f7;--orange:#ff9b2f;
   --red:#ff3b30;--blue:#0a67d8;--shadow:0 5px 18px rgba(30,70,70,.08);
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+body{margin:0;min-height:100svh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
 header{background:linear-gradient(135deg,#1f7e79,#146b68);color:white;padding:calc(12px + env(safe-area-inset-top)) 18px 14px;position:sticky;top:0;z-index:10}
 .headrow{display:flex;align-items:center;justify-content:space-between;max-width:980px;margin:auto}
 header h1{font-size:22px;margin:0;font-weight:800;letter-spacing:.01em}
@@ -179,7 +181,7 @@ canvas{width:100%;height:100%}
 .row:first-child{border-top:0}.muted{font-size:14px;color:var(--muted);line-height:1.5}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .empty{text-align:center;color:var(--muted);padding:22px}
 .saved{display:inline-block;margin-top:9px;background:#e7f6f4;color:var(--teal-dark);padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.98);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 calc(10px + env(safe-area-inset-bottom));z-index:12}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 calc(10px + env(safe-area-inset-bottom));z-index:12}
 .bottom-nav button{background:transparent;color:#5c696f;padding:5px 0;font-size:12px}.bottom-nav button.active{color:var(--teal-dark)}
 .bottom-nav .bicon{display:block;font-size:20px;margin-bottom:2px}
 .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:30;display:none;align-items:flex-end;justify-content:center}
@@ -217,21 +219,7 @@ canvas{width:100%;height:100%}
 }
 
 
-/* v5.4: ensure the bottom area under the tab bar stays white on iPhone */
-body::after{
-  content:"";
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  height:calc(78px + env(safe-area-inset-bottom));
-  background:rgba(255,255,255,.98);
-  z-index:11;
-  pointer-events:none;
-}
-body{
-  min-height:100svh;
-}
+
 </style>
 </head>
 <body>
