@@ -935,8 +935,8 @@ render();
   document.addEventListener("touchend",(e)=>{
     if(!startTarget || e.changedTouches.length!==1)return;
 
-    // Don't hijack form controls, buttons, date inputs, settings, or horizontally-scrollable charts.
-    if(startTarget.closest("input,button,select,textarea,.settings-overlay,.chart-scroll,.scroll-wrap,.canvas-scroll")){
+    // Do not change pages when the gesture starts on a graph; horizontal swipes there are reserved for graph scrolling.
+    if(startTarget.closest("input,button,select,textarea,.settings-overlay,.chart,.chart-shell,.y-axis-fixed,.chart-scroll,.scroll-wrap,.canvas-scroll")){
       startTarget=null;
       return;
     }
