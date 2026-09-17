@@ -282,7 +282,7 @@ canvas{width:100%;height:100%}
   <div class="card">
     <h2 class="card-title"><span class="icon">⌁</span>体重の推移</h2>
     <div class="summary">
-      <div class="metric"><div class="label">最新の体重</div><div class="value" id="latestW">—</div><div class="sub" id="latestWDate"></div></div>
+      <div class="metric"><div class="label">参照日の体重</div><div class="value" id="latestW">—</div><div class="sub" id="latestWDate"></div></div>
       <div class="metric"><div class="label">前日比</div><div class="value blue" id="weightDiff">—</div><div class="sub"></div></div>
       <div class="metric"><div class="label">目標まで</div><div class="value" id="toGoal">—</div><div class="sub" id="goalSub"></div></div>
     </div>
@@ -509,6 +509,14 @@ document.getElementById("save").onclick=()=>{
   if(i>=0)d[i]=rec;else d.push(rec);
   saveData(d);
   saveInternalDailyBackup();
+
+  // 保存した日をグラフの参照日にする（カロリー記録がある場合）
+  if(c!=null){
+    const cs=calorieRecords();
+    const ref=cs.findIndex(r=>r.date===dt);
+    calorieRefIndex=ref>=0?ref:null;
+  }
+
   date.value=today();syncDateDisplay();loadRecordForSelectedDate();
   saved.style.display="inline-block";setTimeout(()=>saved.style.display="none",1600);
   render();switchPage("graphs");
@@ -556,10 +564,13 @@ function goTodayCalRef(){
 function renderSummary(){
   const d=sorted();
   const ws=d.filter(x=>x.weight!=null),cs=d.filter(x=>x.calories!=null);
-  const lw=ws.at(-1),pw=ws.at(-2),g=getGoal();
+  const g=getGoal();
 
   ensureCalorieRef();
   const lc=(calorieRefIndex!==null && cs.length)?cs[calorieRefIndex]:null;
+  const refDate=lc?lc.date:null;
+  const lw=refDate?d.find(x=>x.date===refDate && x.weight!=null):null;
+  const pw=lw?[...ws].reverse().find(x=>x.date<refDate):null;
 
   calRefDate.textContent=lc?jpDate(lc.date):"—";
   prevCalRef.disabled=!lc || calorieRefIndex<=0;
@@ -618,17 +629,6 @@ function drawCalChart(){
     ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();ctx.setLineDash([]);
   });
 
-  // 基準カロリーの赤い点線は目安線とは別に必ず描画する
-  if(calBase>=min && calBase<=max){
-    const baseY=Y(calBase);
-    ctx.strokeStyle="#ff3b30";
-    ctx.lineWidth=2;
-    ctx.setLineDash([7,5]);
-    ctx.beginPath();ctx.moveTo(p.l,baseY);ctx.lineTo(W-p.r,baseY);ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.lineWidth=1;
-  }
-
   const calAxis=prepareAxisCanvas(ccAxis);
   calAxis.ctx.font="12px sans-serif";
   calAxis.ctx.fillStyle="#536168";
@@ -639,9 +639,6 @@ function drawCalChart(){
   calAxis.ctx.fillStyle="#5d6a70";
   calAxis.ctx.textAlign="left";
   calAxis.ctx.fillText("kcal",8,p.t-7);
-  ctx.fillStyle="#ff3b30";ctx.textAlign="right";ctx.fillText("基準 "+calBase.toLocaleString(),W-p.r,Y(calBase)-8);
-
-
   const barW=Math.max(12,Math.min(42,step*.58));
   rows.forEach((r,i)=>{
     const rawTop=Y(Math.max(min,Math.min(max,r.calories))), bottom=Y(min);
@@ -674,11 +671,25 @@ function drawCalChart(){
 
       const label="平均 "+Math.round(avgCal).toLocaleString()+" kcal";
       ctx.font="12px sans-serif";
-      const tx=lineStart+6, ty=ay-11;
+      const tx=lineEnd-4, ty=ay-11;
       ctx.fillStyle="#0f8b8d";
-      ctx.textAlign="left";
+      ctx.textAlign="right";
       ctx.fillText(label,tx,ty);
     }
+  }
+
+  // 基準カロリーの赤い点線は棒グラフより手前に描画する
+  if(calBase>=min && calBase<=max){
+    const baseY=Y(calBase);
+    ctx.strokeStyle="#ff3b30";
+    ctx.lineWidth=2;
+    ctx.setLineDash([7,5]);
+    ctx.beginPath();ctx.moveTo(p.l,baseY);ctx.lineTo(W-p.r,baseY);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth=1;
+    ctx.fillStyle="#ff3b30";
+    ctx.textAlign="right";
+    ctx.fillText("基準 "+calBase.toLocaleString(),W-p.r,baseY-8);
   }
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
