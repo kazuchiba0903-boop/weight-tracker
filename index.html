@@ -221,6 +221,27 @@ canvas{width:100%;height:100%}
 
 
 
+
+.weight-range{
+  display:flex;
+  gap:6px;
+  justify-content:flex-end;
+  margin:0 0 8px;
+}
+.weight-range-btn{
+  border:1px solid var(--border);
+  background:#fff;
+  color:#58666d;
+  border-radius:9px;
+  padding:7px 11px;
+  font-size:12px;
+  font-weight:700;
+}
+.weight-range-btn.active{
+  background:#e9f4f3;
+  color:var(--teal-dark);
+  border-color:#8fc8c4;
+}
 </style>
 </head>
 <body>
@@ -265,10 +286,11 @@ canvas{width:100%;height:100%}
       <div class="cal-ref-date" id="calRefDate">—</div>
       <button class="cal-ref-btn" id="nextCalRef" type="button" aria-label="次の記録日">▶︎</button>
     </div>
-    <div class="summary">
+    <div class="summary" id="calSummary">
       <div class="metric"><div class="label">参照日の摂取カロリー</div><div class="value" id="latestCal">—</div><div class="sub" id="latestCalDate"></div></div>
       <div class="metric"><div class="label">基準との差</div><div class="value blue" id="calDiff">—</div><div class="sub" id="calBaseSub">—</div></div>
       <div class="metric"><div class="label">基準との差 ÷ 7,200</div><div class="value" id="calKg">—</div><div class="sub">参照日の差を体重換算</div></div>
+      <div class="metric"><div class="label">過去7日間の体重増減</div><div class="value" id="calWeekKg">—</div><div class="sub" id="calWeekKgSub">基準との差の合計 ÷ 7,200</div></div>
     </div>
     <div class="chart-shell"><div class="y-axis-fixed"><canvas id="ccAxis"></canvas></div><div class="chart" id="calChartScroll"><canvas id="cc"></canvas></div></div>
     <div class="legend-note">
@@ -280,15 +302,27 @@ canvas{width:100%;height:100%}
   </div>
 
   <div class="card">
-    <h2 class="card-title"><span class="icon">⌁</span>体重の推移</h2>
-    <div class="summary">
+    <h2 class="card-title"><span class="icon">⌁</span>体重の推移<button class="cal-ref-today" id="todayWeightRef" type="button">今日</button></h2>
+    <div class="cal-ref-nav">
+      <button class="cal-ref-btn" id="prevWeightRef" type="button" aria-label="前の記録日">◀︎</button>
+      <div class="cal-ref-date" id="weightRefDate">—</div>
+      <button class="cal-ref-btn" id="nextWeightRef" type="button" aria-label="次の記録日">▶︎</button>
+    </div>
+    <div class="summary" id="weightSummary">
       <div class="metric"><div class="label">参照日の体重</div><div class="value" id="latestW">—</div><div class="sub" id="latestWDate"></div></div>
       <div class="metric"><div class="label">前日比</div><div class="value blue" id="weightDiff">—</div><div class="sub"></div></div>
+      <div class="metric"><div class="label">1週間前との体重差</div><div class="value blue" id="weightWeekDiff">—</div><div class="sub" id="weightWeekDiffSub"></div></div>
       <div class="metric"><div class="label">目標まで</div><div class="value" id="toGoal">—</div><div class="sub" id="goalSub"></div></div>
+    </div>
+    <div class="weight-range" aria-label="体重グラフの表示期間">
+      <button type="button" class="weight-range-btn active" data-weight-range="7">7日</button>
+      <button type="button" class="weight-range-btn" data-weight-range="14">2週間</button>
+      <button type="button" class="weight-range-btn" data-weight-range="30">1ヶ月</button>
     </div>
     <div class="chart-shell"><div class="y-axis-fixed"><canvas id="wcAxis"></canvas></div><div class="chart" id="weightChartScroll"><canvas id="wc"></canvas></div></div>
     <div class="legend-note">
-      ・1画面には約7日分を表示し、横スクロールでそれ以前の記録も確認できます。<br>
+      ・初期表示は7日です。上のボタンで2週間・1ヶ月表示に切り替えられます。<br>
+      ・横スクロールでそれ以前の記録も確認できます。<br>
       ・縦軸の上限は設定画面から変更できます。空欄の場合は、記録されている最大体重＋1 kgで自動設定します。<br>
       ・目標体重を設定している場合は縦軸の最小値になり、目標体重の破線を表示します。<br>
       ・目標体重が未設定の場合は、記録されている最小体重より少し低い値を自動で最小値にします。
@@ -425,13 +459,13 @@ function lastSevenDays(data){
 function chartRowsWithValue(key){
   return sorted().filter(r=>r[key]!=null);
 }
-function chartCssWidth(scrollEl, count){
+function chartCssWidth(scrollEl, count, visibleCount=7){
   const viewport=Math.max(scrollEl.clientWidth,280);
-  if(count<=7)return viewport;
-  return Math.round(viewport*(count/7));
+  if(count<=visibleCount)return viewport;
+  return Math.round(viewport*(count/visibleCount));
 }
-function prepareScrollableCanvas(canvas, scrollEl, count){
-  const cssW=chartCssWidth(scrollEl,count);
+function prepareScrollableCanvas(canvas, scrollEl, count, visibleCount=7){
+  const cssW=chartCssWidth(scrollEl,count,visibleCount);
   canvas.style.width=cssW+"px";
   canvas.style.height="330px";
   const pr=devicePixelRatio||1;
@@ -510,11 +544,16 @@ document.getElementById("save").onclick=()=>{
   saveData(d);
   saveInternalDailyBackup();
 
-  // 保存した日をグラフの参照日にする（カロリー記録がある場合）
+  // 保存した日をグラフの参照日にする
   if(c!=null){
     const cs=calorieRecords();
     const ref=cs.findIndex(r=>r.date===dt);
     calorieRefIndex=ref>=0?ref:null;
+  }
+  if(w!=null){
+    const ws=weightRecords();
+    const ref=ws.findIndex(r=>r.date===dt);
+    weightRefIndex=ref>=0?ref:null;
   }
 
   date.value=today();syncDateDisplay();loadRecordForSelectedDate();
@@ -528,6 +567,41 @@ let calorieRefIndex=null;
 function calorieRecords(){
   return sorted().filter(r=>r.calories!=null);
 }
+
+function weightRecords(){
+  return sorted().filter(r=>r.weight!=null);
+}
+
+let weightRefIndex=null;
+
+function ensureWeightRef(){
+  const ws=weightRecords();
+  if(!ws.length){
+    weightRefIndex=null;
+    return;
+  }
+  if(weightRefIndex===null || weightRefIndex<0 || weightRefIndex>=ws.length){
+    weightRefIndex=ws.length-1;
+  }
+}
+
+function shiftWeightRef(delta){
+  const ws=weightRecords();
+  if(!ws.length)return;
+  ensureWeightRef();
+  weightRefIndex=Math.max(0,Math.min(ws.length-1,weightRefIndex+delta));
+  renderSummary();
+}
+
+function goTodayWeightRef(){
+  const ws=weightRecords();
+  if(!ws.length)return;
+  const t=today();
+  const idx=ws.findIndex(r=>r.date===t);
+  weightRefIndex=idx>=0?idx:ws.length-1;
+  renderSummary();
+}
+
 
 function ensureCalorieRef(){
   const cs=calorieRecords();
@@ -567,14 +641,19 @@ function renderSummary(){
   const g=getGoal();
 
   ensureCalorieRef();
+  ensureWeightRef();
   const lc=(calorieRefIndex!==null && cs.length)?cs[calorieRefIndex]:null;
-  const refDate=lc?lc.date:null;
-  const lw=refDate?d.find(x=>x.date===refDate && x.weight!=null):null;
-  const pw=lw?[...ws].reverse().find(x=>x.date<refDate):null;
+  const lw=(weightRefIndex!==null && ws.length)?ws[weightRefIndex]:null;
+  const weightDate=lw?lw.date:null;
+  const pw=lw?[...ws].reverse().find(x=>x.date<weightDate):null;
 
   calRefDate.textContent=lc?jpDate(lc.date):"—";
   prevCalRef.disabled=!lc || calorieRefIndex<=0;
   nextCalRef.disabled=!lc || calorieRefIndex>=cs.length-1;
+
+  weightRefDate.textContent=lw?jpDate(lw.date):"—";
+  prevWeightRef.disabled=!lw || weightRefIndex<=0;
+  nextWeightRef.disabled=!lw || weightRefIndex>=ws.length-1;
 
   const currentCalBase=getCalBase();
   calBaseSub.textContent="基準 "+currentCalBase.toLocaleString()+" kcal";
@@ -587,14 +666,49 @@ function renderSummary(){
 
     const kg=z/7200;
     calKg.textContent=(kg>0?"+":"")+kg.toFixed(2)+" kg";
+
+    // 参照日を含む過去7日間（参照日＋直前6日）の基準カロリーとの差を合計して体重換算
+    const ref=parseDateLocal(lc.date);
+    const start=new Date(ref);start.setDate(start.getDate()-6);
+    const weekRows=d.filter(r=>{
+      if(r.calories==null)return false;
+      const dt=parseDateLocal(r.date);
+      return dt>=start && dt<=ref;
+    });
+    const weekDiffKcal=weekRows.reduce((sum,r)=>sum+(r.calories-calBase),0);
+    const weekKg=weekDiffKcal/7200;
+    calWeekKg.textContent=(weekKg>0?"+":"")+weekKg.toFixed(2)+" kg";
+    calWeekKgSub.textContent=`${jpDate(lc.date)}まで7日間・${weekRows.length}日記録`;
   }else{
     calDiff.textContent="—";
     calKg.textContent="—";
+    calWeekKg.textContent="—";
+    calWeekKgSub.textContent="基準との差の合計 ÷ 7,200";
   }
 
   latestW.textContent=lw?lw.weight.toFixed(1)+" kg":"—";
   latestWDate.textContent=lw?jpDate(lw.date):"";
   if(lw&&pw){const z=lw.weight-pw.weight;weightDiff.textContent=(z>0?"+":"")+z.toFixed(1)+" kg"}else weightDiff.textContent="—";
+
+  if(lw){
+    const ref=parseDateLocal(lw.date);
+    const prior=new Date(ref);prior.setDate(prior.getDate()-7);
+    const y=prior.getFullYear(),m=String(prior.getMonth()+1).padStart(2,"0"),day=String(prior.getDate()).padStart(2,"0");
+    const priorDate=`${y}-${m}-${day}`;
+    const priorWeek=d.find(r=>r.date===priorDate && r.weight!=null);
+    if(priorWeek){
+      const z=lw.weight-priorWeek.weight;
+      weightWeekDiff.textContent=(z>0?"+":"")+z.toFixed(1)+" kg";
+      weightWeekDiffSub.textContent=jpDate(priorDate)+"との比較";
+    }else{
+      weightWeekDiff.textContent="—";
+      weightWeekDiffSub.textContent=jpDate(priorDate)+"の記録なし";
+    }
+  }else{
+    weightWeekDiff.textContent="—";
+    weightWeekDiffSub.textContent="";
+  }
+
   if(lw&&g!=null){
     const z=lw.weight-g;
     toGoal.textContent=Math.abs(z)<0.05?"達成":(z>0?"+":"−")+Math.abs(z).toFixed(1)+" kg";
@@ -689,15 +803,17 @@ function drawCalChart(){
     ctx.lineWidth=1;
     ctx.fillStyle="#ff3b30";
     ctx.textAlign="right";
-    ctx.fillText("基準 "+calBase.toLocaleString(),W-p.r,baseY-8);
+    ctx.fillText("基準 "+calBase.toLocaleString()+" kcal",W-p.r,baseY-8);
   }
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
   rows.forEach((r,i)=>ctx.fillText(shortDate(r.date),X(i),H-16));
 }
 
+let weightRangeDays=7;
+
 function drawWeightChart(){
-  const rows=chartRowsWithValue("weight"), {ctx,W,H}=prepareScrollableCanvas(wc,weightChartScroll,rows.length), g=getGoal();
+  const rows=chartRowsWithValue("weight"), {ctx,W,H}=prepareScrollableCanvas(wc,weightChartScroll,rows.length,weightRangeDays), g=getGoal();
   if(!rows.length){ctx.fillStyle="#78868c";ctx.textAlign="center";ctx.font="14px sans-serif";ctx.fillText("記録するとグラフが表示されます",W/2,H/2);return}
   const vals=rows.map(x=>x.weight);
   let min=g!=null?g:Math.floor((Math.min(...vals)-1)*10)/10;
@@ -737,7 +853,10 @@ function drawWeightChart(){
   ctx.fillStyle="#2b9da0";rows.forEach((r,i)=>{ctx.beginPath();ctx.arc(X(i),Y(r.weight),4.5,0,Math.PI*2);ctx.fill()});
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
-  rows.forEach((r,i)=>ctx.fillText(shortDate(r.date),X(i),H-16));
+  const labelEvery=weightRangeDays===30?5:(weightRangeDays===14?2:1);
+  rows.forEach((r,i)=>{
+    if(i%labelEvery===0 || i===rows.length-1)ctx.fillText(shortDate(r.date),X(i),H-16);
+  });
 }
 
 function renderHistory(){
@@ -765,6 +884,18 @@ function renderCharts(){
 document.getElementById("prevCalRef").addEventListener("click",()=>shiftCalorieRef(-1));
 document.getElementById("nextCalRef").addEventListener("click",()=>shiftCalorieRef(1));
 document.getElementById("todayCalRef").addEventListener("click",goTodayCalRef);
+document.getElementById("prevWeightRef").addEventListener("click",()=>shiftWeightRef(-1));
+document.getElementById("nextWeightRef").addEventListener("click",()=>shiftWeightRef(1));
+document.getElementById("todayWeightRef").addEventListener("click",goTodayWeightRef);
+
+document.querySelectorAll("[data-weight-range]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    weightRangeDays=Number(btn.dataset.weightRange);
+    document.querySelectorAll("[data-weight-range]").forEach(x=>x.classList.toggle("active",x===btn));
+    drawWeightChart();
+    requestAnimationFrame(()=>{weightChartScroll.scrollLeft=weightChartScroll.scrollWidth;});
+  });
+});
 
 function render(){renderSummary();renderHistory();if(document.getElementById("graphs").classList.contains("active"))renderCharts()}
 
@@ -931,6 +1062,24 @@ window.addEventListener("resize",()=>{if(graphs.classList.contains("active"))ren
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
 render();
 
+// v6.3: swipe the summary panels to move the reference date
+function addReferenceSwipe(el, shiftFn){
+  let sx=0,sy=0;
+  el.addEventListener("touchstart",e=>{
+    if(e.touches.length!==1)return;
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;
+  },{passive:true});
+  el.addEventListener("touchend",e=>{
+    if(e.changedTouches.length!==1)return;
+    const dx=e.changedTouches[0].clientX-sx;
+    const dy=e.changedTouches[0].clientY-sy;
+    if(Math.abs(dx)<45 || Math.abs(dx)<Math.abs(dy)*1.2)return;
+    shiftFn(dx<0?1:-1);
+  },{passive:true});
+}
+addReferenceSwipe(document.getElementById("calSummary"),shiftCalorieRef);
+addReferenceSwipe(document.getElementById("weightSummary"),shiftWeightRef);
+
 // v5.9: swipe left/right to switch between Input / Graph / History
 (() => {
   const order=["input","graphs","history"];
@@ -947,7 +1096,7 @@ render();
     if(!startTarget || e.changedTouches.length!==1)return;
 
     // Do not change pages when the gesture starts on a graph; horizontal swipes there are reserved for graph scrolling.
-    if(startTarget.closest("input,button,select,textarea,.settings-overlay,.chart,.chart-shell,.y-axis-fixed,.chart-scroll,.scroll-wrap,.canvas-scroll")){
+    if(startTarget.closest("input,button,select,textarea,.settings-overlay,.summary,.chart,.chart-shell,.y-axis-fixed,.chart-scroll,.scroll-wrap,.canvas-scroll")){
       startTarget=null;
       return;
     }
