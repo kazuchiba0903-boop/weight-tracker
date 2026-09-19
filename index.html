@@ -263,6 +263,17 @@ canvas{width:100%;height:100%}
 .calendar-day.has-data::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--teal-dark);bottom:4px;left:50%;transform:translateX(-50%)}
 .calendar-note{font-size:11px;color:var(--muted);margin-top:10px;text-align:right}
 .calendar-dot-demo{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal-dark);vertical-align:middle}
+
+.calendar-day.future{
+  color:#c6cccf;
+  background:#fafcfc;
+  opacity:.5;
+}
+.calendar-day:disabled,
+.calendar-month-btn:disabled{
+  cursor:default;
+  opacity:.35;
+}
 </style>
 </head>
 <body>
@@ -601,7 +612,9 @@ function shiftGraphRef(delta){
   ensureGraphRefDate();
   const d=parseDateLocal(graphRefDate);
   d.setDate(d.getDate()+delta);
-  graphRefDate=formatDateLocal(d);
+  const next=formatDateLocal(d);
+  if(next>today())return;
+  graphRefDate=next;
   syncGraphReference();
 }
 function goTodayGraphRef(){
@@ -609,6 +622,7 @@ function goTodayGraphRef(){
   syncGraphReference();
 }
 function setGraphRefDate(dateStr){
+  if(dateStr>today())return;
   graphRefDate=dateStr;
   syncGraphReference();
 }
@@ -634,8 +648,11 @@ function renderSummary(){
 
   calRefDate.textContent=jpDate(refDate);
   weightRefDate.textContent=jpDate(refDate);
-  prevCalRef.disabled=false;nextCalRef.disabled=false;
-  prevWeightRef.disabled=false;nextWeightRef.disabled=false;
+  prevCalRef.disabled=false;
+  prevWeightRef.disabled=false;
+  const atToday=refDate>=today();
+  nextCalRef.disabled=atToday;
+  nextWeightRef.disabled=atToday;
 
   const currentCalBase=getCalBase();
   calBaseSub.textContent="基準 "+currentCalBase.toLocaleString()+" kcal";
@@ -1068,6 +1085,8 @@ function renderGraphCalendar(){
   const view=calendarViewDate||parseDateLocal(graphRefDate||today());
   const year=view.getFullYear(),month=view.getMonth();
   graphCalendarTitle.textContent=`${year}年${month+1}月`;
+  const now=parseDateLocal(today());
+  calendarNextMonth.disabled=(year>now.getFullYear()) || (year===now.getFullYear() && month>=now.getMonth());
   graphCalendarGrid.innerHTML="";
   const dataDates=new Set(allGraphDates());
   const first=new Date(year,month,1);
@@ -1081,8 +1100,16 @@ function renderGraphCalendar(){
     if(d.getMonth()!==month)b.classList.add("other");
     if(dataDates.has(ds))b.classList.add("has-data");
     if(ds===graphRefDate)b.classList.add("selected");
+    if(ds>today()){
+      b.disabled=true;
+      b.classList.add("future");
+    }
     b.textContent=d.getDate();
-    b.addEventListener("click",()=>{setGraphRefDate(ds);closeGraphCalendar();});
+    b.addEventListener("click",()=>{
+      if(ds>today())return;
+      setGraphRefDate(ds);
+      closeGraphCalendar();
+    });
     graphCalendarGrid.appendChild(b);
   }
 }
@@ -1090,7 +1117,14 @@ document.getElementById("calCalendarBtn").addEventListener("click",openGraphCale
 document.getElementById("weightCalendarBtn").addEventListener("click",openGraphCalendar);
 document.getElementById("calendarClose").addEventListener("click",closeGraphCalendar);
 document.getElementById("calendarPrevMonth").addEventListener("click",()=>{calendarViewDate.setMonth(calendarViewDate.getMonth()-1);renderGraphCalendar();});
-document.getElementById("calendarNextMonth").addEventListener("click",()=>{calendarViewDate.setMonth(calendarViewDate.getMonth()+1);renderGraphCalendar();});
+document.getElementById("calendarNextMonth").addEventListener("click",()=>{
+  const next=new Date(calendarViewDate);
+  next.setMonth(next.getMonth()+1);
+  const now=parseDateLocal(today());
+  if(next.getFullYear()>now.getFullYear() || (next.getFullYear()===now.getFullYear() && next.getMonth()>now.getMonth()))return;
+  calendarViewDate=next;
+  renderGraphCalendar();
+});
 graphCalendarOverlay.addEventListener("click",e=>{if(e.target===graphCalendarOverlay)closeGraphCalendar();});
 
 // v6.3: swipe the summary panels to move the reference date
