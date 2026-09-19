@@ -242,6 +242,27 @@ canvas{width:100%;height:100%}
   color:var(--teal-dark);
   border-color:#8fc8c4;
 }
+
+.title-actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+.calendar-mini{
+  width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:9px;
+  background:#fff;color:var(--teal-dark);font-size:16px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;line-height:1
+}
+.calendar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:35;display:none;align-items:center;justify-content:center;padding:16px}
+.calendar-overlay.open{display:flex}
+.calendar-panel{width:min(360px,100%);background:#fff;border-radius:18px;padding:14px;box-shadow:0 18px 40px rgba(0,0,0,.22)}
+.calendar-head{display:grid;grid-template-columns:38px 1fr 38px 38px;gap:6px;align-items:center;margin-bottom:10px}
+.calendar-title{text-align:center;font-size:17px;font-weight:900;color:var(--teal-dark)}
+.calendar-month-btn,.calendar-close{height:36px;padding:0;border:1px solid var(--border);border-radius:9px;background:#f7fbfb;color:var(--teal-dark);font-size:17px}
+.calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.calendar-weekdays{font-size:11px;color:var(--muted);text-align:center;margin-bottom:4px}
+.calendar-day{position:relative;aspect-ratio:1;border:0;border-radius:10px;background:#fff;color:var(--text);font-size:14px;padding:0}
+.calendar-day.other{color:#aab3b7}
+.calendar-day.selected{background:#e4f4f2;color:var(--teal-dark);font-weight:900}
+.calendar-day.has-data::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--teal-dark);bottom:4px;left:50%;transform:translateX(-50%)}
+.calendar-note{font-size:11px;color:var(--muted);margin-top:10px;text-align:right}
+.calendar-dot-demo{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal-dark);vertical-align:middle}
 </style>
 </head>
 <body>
@@ -280,7 +301,7 @@ canvas{width:100%;height:100%}
 
 <section id="graphs" class="page">
   <div class="card">
-    <h2 class="card-title"><span class="icon">▥</span>摂取カロリー<button class="cal-ref-today" id="todayCalRef" type="button">今日</button></h2>
+    <h2 class="card-title"><span class="icon">▥</span>摂取カロリー<span class="title-actions"><button class="calendar-mini" id="calCalendarBtn" type="button" aria-label="カレンダー">▦</button><button class="cal-ref-today" id="todayCalRef" type="button">今日</button></span></h2>
     <div class="cal-ref-nav">
       <button class="cal-ref-btn" id="prevCalRef" type="button" aria-label="前の記録日">◀︎</button>
       <div class="cal-ref-date" id="calRefDate">—</div>
@@ -302,7 +323,7 @@ canvas{width:100%;height:100%}
   </div>
 
   <div class="card">
-    <h2 class="card-title"><span class="icon">⌁</span>体重の推移<button class="cal-ref-today" id="todayWeightRef" type="button">今日</button></h2>
+    <h2 class="card-title"><span class="icon">⌁</span>体重の推移<span class="title-actions"><button class="calendar-mini" id="weightCalendarBtn" type="button" aria-label="カレンダー">▦</button><button class="cal-ref-today" id="todayWeightRef" type="button">今日</button></span></h2>
     <div class="cal-ref-nav">
       <button class="cal-ref-btn" id="prevWeightRef" type="button" aria-label="前の記録日">◀︎</button>
       <div class="cal-ref-date" id="weightRefDate">—</div>
@@ -321,7 +342,7 @@ canvas{width:100%;height:100%}
     </div>
     <div class="chart-shell"><div class="y-axis-fixed"><canvas id="wcAxis"></canvas></div><div class="chart" id="weightChartScroll"><canvas id="wc"></canvas></div></div>
     <div class="legend-note">
-      ・初期表示は7日です。上のボタンで2週間・1ヶ月表示に切り替えられます。<br>
+      ・初期表示は7日です。2週間表示では最新日を基準に2日おき、1ヶ月表示では5日おきに日付を表示します。<br>
       ・横スクロールでそれ以前の記録も確認できます。<br>
       ・縦軸の上限は設定画面から変更できます。空欄の場合は、記録されている最大体重＋1 kgで自動設定します。<br>
       ・目標体重を設定している場合は縦軸の最小値になり、目標体重の破線を表示します。<br>
@@ -338,6 +359,20 @@ canvas{width:100%;height:100%}
 </section>
 </main>
 
+
+<div class="calendar-overlay" id="graphCalendarOverlay" aria-hidden="true">
+  <div class="calendar-panel" role="dialog" aria-modal="true" aria-labelledby="graphCalendarTitle">
+    <div class="calendar-head">
+      <button class="calendar-month-btn" id="calendarPrevMonth" type="button" aria-label="前の月">◀︎</button>
+      <div id="graphCalendarTitle" class="calendar-title">—</div>
+      <button class="calendar-month-btn" id="calendarNextMonth" type="button" aria-label="次の月">▶︎</button>
+      <button class="calendar-close" id="calendarClose" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div class="calendar-weekdays"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+    <div class="calendar-grid" id="graphCalendarGrid"></div>
+    <div class="calendar-note"><span class="calendar-dot-demo"></span> 記録がある日</div>
+  </div>
+</div>
 
 <div class="settings-overlay" id="settingsOverlay" aria-hidden="true">
   <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -544,17 +579,8 @@ document.getElementById("save").onclick=()=>{
   saveData(d);
   saveInternalDailyBackup();
 
-  // 保存した日をグラフの参照日にする
-  if(c!=null){
-    const cs=calorieRecords();
-    const ref=cs.findIndex(r=>r.date===dt);
-    calorieRefIndex=ref>=0?ref:null;
-  }
-  if(w!=null){
-    const ws=weightRecords();
-    const ref=ws.findIndex(r=>r.date===dt);
-    weightRefIndex=ref>=0?ref:null;
-  }
+  // 保存した日をグラフの共通参照日にする
+  graphRefDate=dt;
 
   date.value=today();syncDateDisplay();loadRecordForSelectedDate();
   saved.style.display="inline-block";setTimeout(()=>saved.style.display="none",1600);
@@ -562,77 +588,36 @@ document.getElementById("save").onclick=()=>{
 };
 
 
-let calorieRefIndex=null;
+let graphRefDate=null;
 
-function calorieRecords(){
-  return sorted().filter(r=>r.calories!=null);
+function allGraphDates(){
+  return sorted().filter(r=>r.weight!=null || r.calories!=null).map(r=>r.date);
 }
-
-function weightRecords(){
-  return sorted().filter(r=>r.weight!=null);
+function ensureGraphRefDate(){
+  const dates=allGraphDates();
+  if(!graphRefDate)graphRefDate=dates.length?dates[dates.length-1]:today();
 }
-
-let weightRefIndex=null;
-
-function ensureWeightRef(){
-  const ws=weightRecords();
-  if(!ws.length){
-    weightRefIndex=null;
-    return;
-  }
-  if(weightRefIndex===null || weightRefIndex<0 || weightRefIndex>=ws.length){
-    weightRefIndex=ws.length-1;
-  }
+function shiftGraphRef(delta){
+  ensureGraphRefDate();
+  const d=parseDateLocal(graphRefDate);
+  d.setDate(d.getDate()+delta);
+  graphRefDate=formatDateLocal(d);
+  syncGraphReference();
 }
-
-function shiftWeightRef(delta){
-  const ws=weightRecords();
-  if(!ws.length)return;
-  ensureWeightRef();
-  weightRefIndex=Math.max(0,Math.min(ws.length-1,weightRefIndex+delta));
+function goTodayGraphRef(){
+  graphRefDate=today();
+  syncGraphReference();
+}
+function setGraphRefDate(dateStr){
+  graphRefDate=dateStr;
+  syncGraphReference();
+}
+function syncGraphReference(){
   renderSummary();
+  if(document.getElementById("graphs").classList.contains("active"))renderCharts(false);
 }
-
-function goTodayWeightRef(){
-  const ws=weightRecords();
-  if(!ws.length)return;
-  const t=today();
-  const idx=ws.findIndex(r=>r.date===t);
-  weightRefIndex=idx>=0?idx:ws.length-1;
-  renderSummary();
-}
-
-
-function ensureCalorieRef(){
-  const cs=calorieRecords();
-  if(!cs.length){
-    calorieRefIndex=null;
-    return;
-  }
-  if(calorieRefIndex===null || calorieRefIndex<0 || calorieRefIndex>=cs.length){
-    calorieRefIndex=cs.length-1;
-  }
-}
-
-function shiftCalorieRef(delta){
-  const cs=calorieRecords();
-  if(!cs.length)return;
-  ensureCalorieRef();
-  calorieRefIndex=Math.max(0,Math.min(cs.length-1,calorieRefIndex+delta));
-  renderSummary();
-}
-
-function goTodayCalRef(){
-  const cs=calorieRecords();
-  if(!cs.length)return;
-  const now=new Date();
-  const y=now.getFullYear();
-  const m=String(now.getMonth()+1).padStart(2,"0");
-  const d=String(now.getDate()).padStart(2,"0");
-  const today=`${y}-${m}-${d}`;
-  const idx=cs.findIndex(r=>r.date===today);
-  calorieRefIndex=idx>=0?idx:cs.length-1;
-  renderSummary();
+function formatDateLocal(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
 function renderSummary(){
@@ -640,20 +625,17 @@ function renderSummary(){
   const ws=d.filter(x=>x.weight!=null),cs=d.filter(x=>x.calories!=null);
   const g=getGoal();
 
-  ensureCalorieRef();
-  ensureWeightRef();
-  const lc=(calorieRefIndex!==null && cs.length)?cs[calorieRefIndex]:null;
-  const lw=(weightRefIndex!==null && ws.length)?ws[weightRefIndex]:null;
-  const weightDate=lw?lw.date:null;
+  ensureGraphRefDate();
+  const refDate=graphRefDate;
+  const lc=d.find(x=>x.date===refDate && x.calories!=null)||null;
+  const lw=d.find(x=>x.date===refDate && x.weight!=null)||null;
+  const weightDate=refDate;
   const pw=lw?[...ws].reverse().find(x=>x.date<weightDate):null;
 
-  calRefDate.textContent=lc?jpDate(lc.date):"—";
-  prevCalRef.disabled=!lc || calorieRefIndex<=0;
-  nextCalRef.disabled=!lc || calorieRefIndex>=cs.length-1;
-
-  weightRefDate.textContent=lw?jpDate(lw.date):"—";
-  prevWeightRef.disabled=!lw || weightRefIndex<=0;
-  nextWeightRef.disabled=!lw || weightRefIndex>=ws.length-1;
+  calRefDate.textContent=jpDate(refDate);
+  weightRefDate.textContent=jpDate(refDate);
+  prevCalRef.disabled=false;nextCalRef.disabled=false;
+  prevWeightRef.disabled=false;nextWeightRef.disabled=false;
 
   const currentCalBase=getCalBase();
   calBaseSub.textContent="基準 "+currentCalBase.toLocaleString()+" kcal";
@@ -853,9 +835,14 @@ function drawWeightChart(){
   ctx.fillStyle="#2b9da0";rows.forEach((r,i)=>{ctx.beginPath();ctx.arc(X(i),Y(r.weight),4.5,0,Math.PI*2);ctx.fill()});
 
   ctx.fillStyle="#5d6a70";ctx.textAlign="center";
-  const labelEvery=weightRangeDays===30?5:(weightRangeDays===14?2:1);
+  const latestDate=parseDateLocal(rows[rows.length-1].date);
   rows.forEach((r,i)=>{
-    if(i%labelEvery===0 || i===rows.length-1)ctx.fillText(shortDate(r.date),X(i),H-16);
+    const dt=parseDateLocal(r.date);
+    const daysFromLatest=Math.round((latestDate-dt)/86400000);
+    let show=true;
+    if(weightRangeDays===14)show=(daysFromLatest%2===0);
+    else if(weightRangeDays===30)show=(daysFromLatest%5===0);
+    if(show)ctx.fillText(shortDate(r.date),X(i),H-16);
   });
 }
 
@@ -873,20 +860,22 @@ function renderHistory(){
   })
 }
 
-function renderCharts(){
+function renderCharts(scrollLatest=true){
   drawCalChart();
   drawWeightChart();
-  requestAnimationFrame(()=>{
-    calChartScroll.scrollLeft=calChartScroll.scrollWidth;
-    weightChartScroll.scrollLeft=weightChartScroll.scrollWidth;
-  });
+  if(scrollLatest){
+    requestAnimationFrame(()=>{
+      calChartScroll.scrollLeft=calChartScroll.scrollWidth;
+      weightChartScroll.scrollLeft=weightChartScroll.scrollWidth;
+    });
+  }
 }
-document.getElementById("prevCalRef").addEventListener("click",()=>shiftCalorieRef(-1));
-document.getElementById("nextCalRef").addEventListener("click",()=>shiftCalorieRef(1));
-document.getElementById("todayCalRef").addEventListener("click",goTodayCalRef);
-document.getElementById("prevWeightRef").addEventListener("click",()=>shiftWeightRef(-1));
-document.getElementById("nextWeightRef").addEventListener("click",()=>shiftWeightRef(1));
-document.getElementById("todayWeightRef").addEventListener("click",goTodayWeightRef);
+document.getElementById("prevCalRef").addEventListener("click",()=>shiftGraphRef(-1));
+document.getElementById("nextCalRef").addEventListener("click",()=>shiftGraphRef(1));
+document.getElementById("todayCalRef").addEventListener("click",goTodayGraphRef);
+document.getElementById("prevWeightRef").addEventListener("click",()=>shiftGraphRef(-1));
+document.getElementById("nextWeightRef").addEventListener("click",()=>shiftGraphRef(1));
+document.getElementById("todayWeightRef").addEventListener("click",goTodayGraphRef);
 
 document.querySelectorAll("[data-weight-range]").forEach(btn=>{
   btn.addEventListener("click",()=>{
@@ -1062,6 +1051,48 @@ window.addEventListener("resize",()=>{if(graphs.classList.contains("active"))ren
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
 render();
 
+// v6.5: shared graph calendar
+let calendarViewDate=null;
+function openGraphCalendar(){
+  ensureGraphRefDate();
+  calendarViewDate=parseDateLocal(graphRefDate);
+  renderGraphCalendar();
+  graphCalendarOverlay.classList.add("open");
+  graphCalendarOverlay.setAttribute("aria-hidden","false");
+}
+function closeGraphCalendar(){
+  graphCalendarOverlay.classList.remove("open");
+  graphCalendarOverlay.setAttribute("aria-hidden","true");
+}
+function renderGraphCalendar(){
+  const view=calendarViewDate||parseDateLocal(graphRefDate||today());
+  const year=view.getFullYear(),month=view.getMonth();
+  graphCalendarTitle.textContent=`${year}年${month+1}月`;
+  graphCalendarGrid.innerHTML="";
+  const dataDates=new Set(allGraphDates());
+  const first=new Date(year,month,1);
+  const start=new Date(year,month,1-first.getDay());
+  for(let i=0;i<42;i++){
+    const d=new Date(start);d.setDate(start.getDate()+i);
+    const ds=formatDateLocal(d);
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="calendar-day";
+    if(d.getMonth()!==month)b.classList.add("other");
+    if(dataDates.has(ds))b.classList.add("has-data");
+    if(ds===graphRefDate)b.classList.add("selected");
+    b.textContent=d.getDate();
+    b.addEventListener("click",()=>{setGraphRefDate(ds);closeGraphCalendar();});
+    graphCalendarGrid.appendChild(b);
+  }
+}
+document.getElementById("calCalendarBtn").addEventListener("click",openGraphCalendar);
+document.getElementById("weightCalendarBtn").addEventListener("click",openGraphCalendar);
+document.getElementById("calendarClose").addEventListener("click",closeGraphCalendar);
+document.getElementById("calendarPrevMonth").addEventListener("click",()=>{calendarViewDate.setMonth(calendarViewDate.getMonth()-1);renderGraphCalendar();});
+document.getElementById("calendarNextMonth").addEventListener("click",()=>{calendarViewDate.setMonth(calendarViewDate.getMonth()+1);renderGraphCalendar();});
+graphCalendarOverlay.addEventListener("click",e=>{if(e.target===graphCalendarOverlay)closeGraphCalendar();});
+
 // v6.3: swipe the summary panels to move the reference date
 function addReferenceSwipe(el, shiftFn){
   let sx=0,sy=0;
@@ -1077,8 +1108,8 @@ function addReferenceSwipe(el, shiftFn){
     shiftFn(dx<0?1:-1);
   },{passive:true});
 }
-addReferenceSwipe(document.getElementById("calSummary"),shiftCalorieRef);
-addReferenceSwipe(document.getElementById("weightSummary"),shiftWeightRef);
+addReferenceSwipe(document.getElementById("calSummary"),shiftGraphRef);
+addReferenceSwipe(document.getElementById("weightSummary"),shiftGraphRef);
 
 // v5.9: swipe left/right to switch between Input / Graph / History
 (() => {
